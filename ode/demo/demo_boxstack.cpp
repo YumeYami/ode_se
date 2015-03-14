@@ -224,14 +224,23 @@ char locase(char c) {
 #define mons2file "horse.stl"
 //#define cubefile "Mesh.stl"
 #define READ_CLOCKWISE 1
-void stlLoad(string fileName, dTriMeshDataID data, int reading_method) {
-	cout << "init\n";
-	int VertexCount = 0;
-	int IndexCount = 0;
-	int Indices[MAX_INDEX];
-	dVector3 Vertices[MAX_VERTEX];
-	cout << "start loading\n";
 
+#define MAX_VERTEX 9999
+#define MAX_INDEX 9999
+dGeomID TriMesh1;
+dGeomID TriMesh2;
+dGeomID TriMesh3;
+static dTriMeshDataID TriData1, TriData2, TriData3;  // reusable static trimesh data
+int VertexCount1 = 0, IndexCount1 = 0, VertexCount2 = 0, IndexCount2 = 0, VertexCount3 = 0, IndexCount3 = 0;
+dVector3 Vertices1[MAX_VERTEX];
+dVector3 Vertices2[MAX_VERTEX];
+dVector3 Vertices3[MAX_VERTEX];
+int Indices1[MAX_INDEX];
+int Indices2[MAX_INDEX];
+int Indices3[MAX_INDEX];
+
+void stlLoad(string fileName, int &VertexCount, int &IndexCount, int* Indices, dVector3* Vertices, int reading_method) {
+	cout << "start loading\n";
 	/// build trimesh data
 	long i = 0;
 	ifstream file;
@@ -291,7 +300,7 @@ void stlLoad(string fileName, dTriMeshDataID data, int reading_method) {
 	}
 	file.close();
 	cout << "build data\n";
-	dGeomTriMeshDataBuildSimple(data, (dReal*)Vertices, VertexCount, (dTriIndex*)Indices, IndexCount);
+
 	cout << "building completed\n";
 	/// end build trimesh data
 
@@ -440,89 +449,98 @@ static void command(int cmd) {
 			dBodySetMass(obj[i].body, &m);
 		}
 		else if ( cmd == 'm' ) {
-			dTriMeshDataID data;
-			data = dGeomTriMeshDataCreate();
-			stlLoad(cubefile, data, 1);
-			obj[i].geom[0] = dCreateTriMesh(space, data, 0, 0, 0);
+			TriData1 = dGeomTriMeshDataCreate();
+			stlLoad(cubefile, VertexCount1, IndexCount1, &Indices1[0], &Vertices1[0], 1);
+			dGeomTriMeshDataBuildSimple(TriData1, (dReal*)Vertices1, VertexCount1, (dTriIndex*)Indices1, IndexCount1);
+			obj[i].geom[0] = dCreateTriMesh(space, TriData1, 0, 0, 0);
+			dGeomSetData(obj[i].geom[0], TriData1);
 			dMassSetTrimesh(&m, DENSITY, obj[i].geom[0]);
+			//dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
+			dGeomSetPosition(obj[i].geom[0], -m.c[0], -m.c[1], -m.c[2]);
 			dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
 		}
 		else if ( cmd == 'n' ) {
-			dTriMeshDataID data2;
-			data2 = dGeomTriMeshDataCreate();
-			stlLoad(mons1file, data2, 0);
-			obj[i].geom[0] = dCreateTriMesh(space, data2, 0, 0, 0);
+			TriData2 = dGeomTriMeshDataCreate();
+			stlLoad(mons1file, VertexCount2, IndexCount2, &Indices2[0], &Vertices2[0], 0);
+			dGeomTriMeshDataBuildSimple(TriData2, (dReal*)Vertices2, VertexCount2, (dTriIndex*)Indices2, IndexCount2);
+			obj[i].geom[0] = dCreateTriMesh(space, TriData2, 0, 0, 0);
+			dGeomSetData(obj[i].geom[0], TriData2);
 			dMassSetTrimesh(&m, DENSITY, obj[i].geom[0]);
 			cout << "mons1 mass: " << m.c[0] << " " << m.c[1] << " " << m.c[2] << "\n";
+			//dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
+			dGeomSetPosition(obj[i].geom[0], -m.c[0], -m.c[1], -m.c[2]);
 			dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
 		}
 		else if ( cmd == 'k' ) {
-			dTriMeshDataID data3;
-			data3 = dGeomTriMeshDataCreate();
-			stlLoad(mons2file, data3, 0);
-			obj[i].geom[0] = dCreateTriMesh(space, data3, 0, 0, 0);
+			TriData3 = dGeomTriMeshDataCreate();
+			stlLoad(mons2file, VertexCount3, IndexCount3, &Indices3[0], &Vertices3[0], 0);
+			dGeomTriMeshDataBuildSimple(TriData3, (dReal*)Vertices3, VertexCount3, (dTriIndex*)Indices3, IndexCount3);
+			obj[i].geom[0] = dCreateTriMesh(space, TriData3, 0, 0, 0);
+			dGeomSetData(obj[i].geom[0], TriData3);
 			dMassSetTrimesh(&m, DENSITY, obj[i].geom[0]);
+			//dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
+			dGeomSetPosition(obj[i].geom[0], -m.c[0], -m.c[1], -m.c[2]);
 			dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
 		}
-		else if ( cmd == 'l' ) {
-			setBody = 1;
-			// start accumulating masses for the encapsulated geometries
-			dMass m2;
-			dMassSetZero(&m);
-
-			dReal dpos[PART_NUM][3];	// delta-positions for encapsulated geometries
-			dMatrix3 drot[PART_NUM];
-
-			// set random delta positions
-			// 			for ( j = 0; j < PART_NUM; j++ ) {
-			// 				for ( k = 0; k < 3; k++ ) dpos[j][k] = dRandReal()*0.3 - 0.15;
-			// 			}
-			for ( int j = 0; j < 3; j++ )
-				dpos[0][j] = 0;
-			dpos[1][0] = 0;
-			dpos[1][1] = 0;
-			dpos[1][2] = 1;
-			for ( k = 0; k < PART_NUM; k++ ) {
-				if ( k == 0 ) {
-					dTriMeshDataID data = dGeomTriMeshDataCreate();
-					stlLoad(basefile, data, 1);
-					obj[i].geom[k] = dCreateTriMesh(space, data, 0, 0, 0);
-					dMassSetTrimesh(&m2, DENSITY_BASE, obj[i].geom[k]);
-					dMassTranslate(&m2, -m2.c[0], -m2.c[1], -m2.c[2]);
-				}
-				else if ( k == 1 ) {
-					dTriMeshDataID data = dGeomTriMeshDataCreate();
-					stlLoad(bodyfile, data, 1);
-					obj[i].geom[k] = dCreateTriMesh(space, data, 0, 0, 0);
-					dMassSetTrimesh(&m2, DENSITY_BODY, obj[i].geom[k]);
-					dMassTranslate(&m2, -m2.c[0], -m2.c[1], -m2.c[2]);
-				}
-				else {
-					cout << "error: ....\n";
-				}
-
-				//dRFromAxisAndAngle(drot[k], dRandReal()*2.0 - 1.0, dRandReal()*2.0 - 1.0, dRandReal()*2.0 - 1.0, dRandReal()*10.0 - 5.0);
-				dRFromAxisAndAngle(drot[k], 1, 1, 1, 0);
-				dMassRotate(&m2, drot[k]);
-
-				dMassTranslate(&m2, dpos[k][0], dpos[k][1], dpos[k][2]);
-
-				// add to the total mass
-				dMassAdd(&m, &m2);
-
-			}
-			cout << "set body:::\n";
-			for ( k = 0; k < PART_NUM; k++ ) {
-				dGeomSetBody(obj[i].geom[k], obj[i].body);
-				dGeomSetOffsetPosition(obj[i].geom[k],
-									   dpos[k][0] - m.c[0],
-									   dpos[k][1] - m.c[1],
-									   dpos[k][2] - m.c[2]);
-				dGeomSetOffsetRotation(obj[i].geom[k], drot[k]);
-			}
-			dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
-			dBodySetMass(obj[i].body, &m);
-		}
+// 		else if ( cmd == 'l' ) {
+// 			setBody = 1;
+// 			// start accumulating masses for the encapsulated geometries
+// 			dMass m2;
+// 			dMassSetZero(&m);
+// 
+// 			dReal dpos[PART_NUM][3];	// delta-positions for encapsulated geometries
+// 			dMatrix3 drot[PART_NUM];
+// 
+// 			// set random delta positions
+// 			// 			for ( j = 0; j < PART_NUM; j++ ) {
+// 			// 				for ( k = 0; k < 3; k++ ) dpos[j][k] = dRandReal()*0.3 - 0.15;
+// 			// 			}
+// 			for ( int j = 0; j < 3; j++ )
+// 				dpos[0][j] = 0;
+// 			dpos[1][0] = 0;
+// 			dpos[1][1] = 0;
+// 			dpos[1][2] = 1;
+// 			for ( k = 0; k < PART_NUM; k++ ) {
+// 				if ( k == 0 ) {
+// 					dTriMeshDataID data = dGeomTriMeshDataCreate();
+// 					stlLoad(basefile, data, 1);
+// 					obj[i].geom[k] = dCreateTriMesh(space, data, 0, 0, 0);
+// 					dMassSetTrimesh(&m2, DENSITY_BASE, obj[i].geom[k]);
+// 					dMassTranslate(&m2, -m2.c[0], -m2.c[1], -m2.c[2]);
+// 				}
+// 				else if ( k == 1 ) {
+// 					dTriMeshDataID data = dGeomTriMeshDataCreate();
+// 					stlLoad(bodyfile, data, 1);
+// 					obj[i].geom[k] = dCreateTriMesh(space, data, 0, 0, 0);
+// 					dMassSetTrimesh(&m2, DENSITY_BODY, obj[i].geom[k]);
+// 					dMassTranslate(&m2, -m2.c[0], -m2.c[1], -m2.c[2]);
+// 				}
+// 				else {
+// 					cout << "error: ....\n";
+// 				}
+// 
+// 				//dRFromAxisAndAngle(drot[k], dRandReal()*2.0 - 1.0, dRandReal()*2.0 - 1.0, dRandReal()*2.0 - 1.0, dRandReal()*10.0 - 5.0);
+// 				dRFromAxisAndAngle(drot[k], 1, 1, 1, 0);
+// 				dMassRotate(&m2, drot[k]);
+// 
+// 				dMassTranslate(&m2, dpos[k][0], dpos[k][1], dpos[k][2]);
+// 
+// 				// add to the total mass
+// 				dMassAdd(&m, &m2);
+// 
+// 			}
+// 			cout << "set body:::\n";
+// 			for ( k = 0; k < PART_NUM; k++ ) {
+// 				dGeomSetBody(obj[i].geom[k], obj[i].body);
+// 				dGeomSetOffsetPosition(obj[i].geom[k],
+// 									   dpos[k][0] - m.c[0],
+// 									   dpos[k][1] - m.c[1],
+// 									   dpos[k][2] - m.c[2]);
+// 				dGeomSetOffsetRotation(obj[i].geom[k], drot[k]);
+// 			}
+// 			dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
+// 			dBodySetMass(obj[i].body, &m);
+// 		}
 		else if ( cmd == 'z' ) {
 			setBody = 1;
 			// start accumulating masses for the encapsulated geometries
@@ -615,11 +633,11 @@ static void command(int cmd) {
 					dMassSetSphere(&m2, DENSITY_BODY, radius);
 				}
 				else {
-					dTriMeshDataID data = dGeomTriMeshDataCreate();
-					stlLoad(mons1file, data, 1);
-					obj[i].geom[k] = dCreateTriMesh(space, data, 0, 0, 0);
-					dMassSetTrimesh(&m2, DENSITY_BODY, obj[i].geom[k]);
-					dMassTranslate(&m2, -m2.c[0], -m2.c[1], -m2.c[2]);
+// 					dTriMeshDataID data = dGeomTriMeshDataCreate();
+// 					stlLoad(mons1file, data, 1);
+// 					obj[i].geom[k] = dCreateTriMesh(space, data, 0, 0, 0);
+// 					dMassSetTrimesh(&m2, DENSITY_BODY, obj[i].geom[k]);
+// 					dMassTranslate(&m2, -m2.c[0], -m2.c[1], -m2.c[2]);
 				}
 
 				dRFromAxisAndAngle(drot[k], 1.0, 1.0,
@@ -754,7 +772,6 @@ void drawGeom(dGeomID g, const dReal *pos, const dReal *R, int show_aabb) {
 	}
 	else if ( type == dTriMeshClass ) {
 		//cout << "draw trimesh\n";
-		dMass mass = g->body->mass;
 		int tcount = dGeomTriMeshGetTriangleCount(g);
 		dVector3 v0, v1, v2;
 		for ( int i = 0; i < tcount; i++ ) {

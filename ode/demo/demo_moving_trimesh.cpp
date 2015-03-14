@@ -643,8 +643,8 @@ int main(int argc, char **argv) {
 	dGeomTriMeshDataBuildSingle(TriData1, &Vertices[0], 3 * sizeof(float), VertexCount, (dTriIndex*)&Indices[0], IndexCount, 3 * sizeof(dTriIndex));
 	TriData2 = dGeomTriMeshDataCreate();
 	dGeomTriMeshDataBuildSingle(TriData2, &Vertices2[0], 3 * sizeof(float), VertexCount2, (dTriIndex*)&Indices2[0], IndexCount2, 3 * sizeof(dTriIndex));
-	cout << "data1 " << Vertices[0] << " " << Vertices[1] << " " << Vertices[2] << "\n";
-	cout << "data2 " << Vertices2[0] << " " << Vertices2[1] << " " << Vertices2[2] << "\n";
+	//cout << "data1 " << Vertices[0] << " " << Vertices[1] << " " << Vertices[2] << "\n";
+	//cout << "data2 " << Vertices2[0] << " " << Vertices2[1] << " " << Vertices2[2] << "\n";
 
 	TriMesh1 = dCreateTriMesh(space, TriData1, 0, 0, 0);
 	TriMesh2 = dCreateTriMesh(space, TriData2, 0, 0, 0);
