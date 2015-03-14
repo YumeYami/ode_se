@@ -455,6 +455,7 @@ static void command(int cmd) {
 			obj[i].geom[0] = dCreateTriMesh(space, TriData1, 0, 0, 0);
 			dGeomSetData(obj[i].geom[0], TriData1);
 			dMassSetTrimesh(&m, DENSITY, obj[i].geom[0]);
+			cout << "model mass: " << m.c[0] << " " << m.c[1] << " " << m.c[2] << "\n";
 			//dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
 			dGeomSetPosition(obj[i].geom[0], -m.c[0], -m.c[1], -m.c[2]);
 			dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
@@ -466,7 +467,7 @@ static void command(int cmd) {
 			obj[i].geom[0] = dCreateTriMesh(space, TriData2, 0, 0, 0);
 			dGeomSetData(obj[i].geom[0], TriData2);
 			dMassSetTrimesh(&m, DENSITY, obj[i].geom[0]);
-			cout << "mons1 mass: " << m.c[0] << " " << m.c[1] << " " << m.c[2] << "\n";
+			cout << "base mass: " << m.c[0] << " " << m.c[1] << " " << m.c[2] << "\n";
 			//dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
 			dGeomSetPosition(obj[i].geom[0], -m.c[0], -m.c[1], -m.c[2]);
 			dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
@@ -478,6 +479,7 @@ static void command(int cmd) {
 			obj[i].geom[0] = dCreateTriMesh(space, TriData3, 0, 0, 0);
 			dGeomSetData(obj[i].geom[0], TriData3);
 			dMassSetTrimesh(&m, DENSITY, obj[i].geom[0]);
+			cout << "base weight mass: " << m.c[0] << " " << m.c[1] << " " << m.c[2] << "\n";
 			//dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
 			dGeomSetPosition(obj[i].geom[0], -m.c[0], -m.c[1], -m.c[2]);
 			dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
