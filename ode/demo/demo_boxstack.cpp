@@ -502,6 +502,9 @@ static void command(int cmd) {
 			dpos[1][0] = 0;
 			dpos[1][1] = 0;
 			dpos[1][2] = 1;
+			dpos[2][0] = 0;
+			dpos[2][1] = 0;
+			dpos[2][2] = 2;
 			for ( k = 0; k < PART_NUM; k++ ) {
 				if ( k == 0 ) {
 					TriData1 = dGeomTriMeshDataCreate();
