@@ -308,6 +308,10 @@ void stlLoad(string fileName, int &VertexCount, int &IndexCount, int* Indices, d
 
 // called when a key pressed
 
+void calTrimeshFaceMass(dMass* m2, int VertexCount1, int IndexCount1, dVector3* Vertices1, int* Indices1) {
+	
+}
+
 static void command(int cmd) {
 	size_t i;
 	int j, k;
@@ -512,6 +516,7 @@ static void command(int cmd) {
 					dGeomTriMeshDataBuildSimple(TriData1, (dReal*)Vertices1, VertexCount1, (dTriIndex*)Indices1, IndexCount1);
 					obj[i].geom[0] = dCreateTriMesh(space, TriData1, 0, 0, 0);
 					dGeomSetData(obj[i].geom[0], TriData1);
+					calTrimeshFaceMass(&m2,VertexCount1,IndexCount1,Vertices1,Indices1);
 					dMassSetTrimesh(&m2, DENSITY, obj[i].geom[0]);
 					//dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
 					dGeomSetPosition(obj[i].geom[0], -m2.c[0], -m2.c[1], -m.c[2]);
