@@ -229,7 +229,7 @@ void compProjectionIntegrals(FACE *f) {
 	Pabb /= -60.0;
 }
 
-compFaceIntegrals(FACE *f) {
+void compFaceIntegrals(FACE *f) {
 	double *n, w;
 	double k1, k2, k3, k4;
 
@@ -310,21 +310,24 @@ void compVolumeIntegrals(POLYHEDRON *p) {
    */
 
 
-int main3(int argc, char *argv[]) {
+int main3(char* file) {
+	
 	POLYHEDRON p;
 	double density, mass;
 	double r[3];            /* center of mass */
 	double J[3][3];         /* inertia tensor */
-
-	if ( argc != 2 ) {
-		printf("usage:  %s <polyhedron geometry filename>\n", argv[0]);
-		exit(0);
-	}
-
-	readPolyhedron(argv[1], &p);
-
+	
+// 	printf("starting cal property\n");
+// 	if ( argc != 2 ) {
+// 		printf("usage:  %s <polyhedron geometry filename>\n", argv[0]);
+// 		exit(0);
+// 	}
+	printf("reading file\n");
+	//return 0;
+	readPolyhedron(file, &p);
+	//return 0;
 	compVolumeIntegrals(&p);
-
+	//return 0;
 
 	printf("\nT1 =   %+20.6f\n\n", T0);
 
@@ -371,5 +374,5 @@ int main3(int argc, char *argv[]) {
 	printf("%+15.6f  %+15.6f  %+15.6f\n", J[X][X], J[X][Y], J[X][Z]);
 	printf("%+15.6f  %+15.6f  %+15.6f\n", J[Y][X], J[Y][Y], J[Y][Z]);
 	printf("%+15.6f  %+15.6f  %+15.6f\n\n", J[Z][X], J[Z][Y], J[Z][Z]);
-
+	return 0;
 }
