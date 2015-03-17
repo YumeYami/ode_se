@@ -242,13 +242,13 @@ dGeomID TriMesh1;
 dGeomID TriMesh2;
 dGeomID TriMesh3;
 static dTriMeshDataID TriData1, TriData2, TriData3;  // reusable static trimesh data
-int VertexCount1 = 0, IndexCount1 = 0, VertexCount2 = 0, IndexCount2 = 0, VertexCount3 = 0, IndexCount3 = 0;
+int VertexCount0 = 0, IndexCount0 = 0, VertexCount1 = 0, IndexCount1 = 0, VertexCount2 = 0, IndexCount2 = 0;
+dVector3 Vertices0[MAX_VERTEX];
 dVector3 Vertices1[MAX_VERTEX];
 dVector3 Vertices2[MAX_VERTEX];
-dVector3 Vertices3[MAX_VERTEX];
+int Indices0[MAX_INDEX];
 int Indices1[MAX_INDEX];
 int Indices2[MAX_INDEX];
-int Indices3[MAX_INDEX];
 
 void stlLoad(string fileName, int &VertexCount, int &IndexCount, int* Indices, dVector3* Vertices, int reading_method) {
 	//cout << "start loading\n";
@@ -356,8 +356,7 @@ void calModelProperty(double &minHeight, double &minRadius, dMass m2, int Vertex
 			minHeight = Vertices[i][2];
 		}
 	}
-	double cmx = m2.c[0],
-		cmy = m2.c[1];
+	double cmx = m2.c[0], cmy = m2.c[1];
 	minRadius = 0;
 	for ( int i = 0; i < VertexCount; i++ ) {
 		if ( Vertices[i][2] < minHeight + MIN_HEIGHT_ERROR ) {
@@ -367,6 +366,7 @@ void calModelProperty(double &minHeight, double &minRadius, dMass m2, int Vertex
 			}
 		}
 	}
+	minRadius = sqrt(minRadius);
 }
 
 static void command(int cmd) {
@@ -512,8 +512,8 @@ static void command(int cmd) {
 
 		else if ( cmd == 'm' ) {
 			TriData1 = dGeomTriMeshDataCreate();
-			stlLoad(modelFile, VertexCount1, IndexCount1, &Indices1[0], &Vertices1[0], 1);
-			dGeomTriMeshDataBuildSimple(TriData1, (dReal*)Vertices1, VertexCount1, (dTriIndex*)Indices1, IndexCount1);
+			stlLoad(modelFile, VertexCount0, IndexCount0, &Indices0[0], &Vertices0[0], 1);
+			dGeomTriMeshDataBuildSimple(TriData1, (dReal*)Vertices0, VertexCount0, (dTriIndex*)Indices0, IndexCount0);
 			obj[i].geom[0] = dCreateTriMesh(space, TriData1, 0, 0, 0);
 			dGeomSetData(obj[i].geom[0], TriData1);
 			dMassSetTrimesh(&m, DENSITY, obj[i].geom[0]);
@@ -525,8 +525,8 @@ static void command(int cmd) {
 		}
 		else if ( cmd == 'n' ) {
 			TriData2 = dGeomTriMeshDataCreate();
-			stlLoad(baseModelFile, VertexCount2, IndexCount2, &Indices2[0], &Vertices2[0], 0);
-			dGeomTriMeshDataBuildSimple(TriData2, (dReal*)Vertices2, VertexCount2, (dTriIndex*)Indices2, IndexCount2);
+			stlLoad(baseModelFile, VertexCount1, IndexCount1, &Indices1[0], &Vertices1[0], 0);
+			dGeomTriMeshDataBuildSimple(TriData2, (dReal*)Vertices1, VertexCount1, (dTriIndex*)Indices1, IndexCount1);
 			obj[i].geom[0] = dCreateTriMesh(space, TriData2, 0, 0, 0);
 			dGeomSetData(obj[i].geom[0], TriData2);
 			dMassSetTrimesh(&m, DENSITY, obj[i].geom[0]);
@@ -537,8 +537,8 @@ static void command(int cmd) {
 		}
 		else if ( cmd == 'k' ) {
 			TriData3 = dGeomTriMeshDataCreate();
-			stlLoad(baseWeightFile, VertexCount3, IndexCount3, &Indices3[0], &Vertices3[0], 1);
-			dGeomTriMeshDataBuildSimple(TriData3, (dReal*)Vertices3, VertexCount3, (dTriIndex*)Indices3, IndexCount3);
+			stlLoad(baseWeightFile, VertexCount2, IndexCount2, &Indices2[0], &Vertices2[0], 1);
+			dGeomTriMeshDataBuildSimple(TriData3, (dReal*)Vertices2, VertexCount2, (dTriIndex*)Indices2, IndexCount2);
 			obj[i].geom[0] = dCreateTriMesh(space, TriData3, 0, 0, 0);
 			dGeomSetData(obj[i].geom[0], TriData3);
 			dMassSetTrimesh(&m, DENSITY, obj[i].geom[0]);
@@ -575,18 +575,19 @@ static void command(int cmd) {
 			for ( k = 0; k < PART_NUM; k++ ) {
 				if ( k == 0 ) {/// add model
 					TriData1 = dGeomTriMeshDataCreate();
-					stlLoad(modelFile, VertexCount1, IndexCount1, &Indices1[0], &Vertices1[0], 1);
-					dGeomTriMeshDataBuildSimple(TriData1, (dReal*)Vertices1, VertexCount1, (dTriIndex*)Indices1, IndexCount1);
+					stlLoad(modelFile, VertexCount0, IndexCount0, &Indices0[0], &Vertices0[0], 1);
+					dGeomTriMeshDataBuildSimple(TriData1, (dReal*)Vertices0, VertexCount0, (dTriIndex*)Indices0, IndexCount0);
 					obj[i].geom[0] = dCreateTriMesh(space, TriData1, 0, 0, 0);
 					dGeomSetData(obj[i].geom[0], TriData1);
 					dMassSetTrimesh(&m2, DENSITY, obj[i].geom[0]);
 
-					//////////////////////////////////////////////////////////////////////////
-					/// cal model property ///
+					/// cal triangle face property
 					//dMass mFace;
 					//calTrimeshFaceMass(mFace, VertexCount1, IndexCount1, Vertices1, Indices1);
 					//addMass(&m2,&mFace);
-					calModelProperty(minHeight, minRadius, m2, VertexCount1, IndexCount1, Vertices1, Indices1); /// calculate model for min height and radius(contact area)
+
+					/// cal model property
+					calModelProperty(minHeight, minRadius, m2, VertexCount0, IndexCount0, Vertices0, Indices0); /// calculate model for min height and radius(contact area)
 					dpos[1][0] = m2.c[0];
 					dpos[1][1] = m2.c[1];
 					dpos[1][2] = minHeight;
@@ -594,32 +595,29 @@ static void command(int cmd) {
 					dpos[2][1] = m2.c[1];
 					dpos[2][2] = minHeight;
 					cout << "minHeight: " << minHeight << " minRadius: " << minRadius << "\n";
-					//////////////////////////////////////////////////////////////////////////
-					
+
 					dGeomSetPosition(obj[i].geom[0], m2.c[0], m2.c[1], m.c[2]);
 					//dMassTranslate(&m2, -m2.c[0], -m2.c[1], -m2.c[2]);
 					dRFromAxisAndAngle(drot[k], 1, 1, 1, 0);
 				}
 				else if ( k == 1 ) {/// add base
 					TriData2 = dGeomTriMeshDataCreate();
-					stlLoad(baseModelFile, VertexCount2, IndexCount2, &Indices2[0], &Vertices2[0], 0);
+					stlLoad(baseModelFile, VertexCount1, IndexCount1, &Indices1[0], &Vertices1[0], 0);
 					double minBH = 0, minBR = 0;
-					
+
 					/// scaling the base size
-					scaleBaseRadius(SCALING_X, SCALING_Y, SCALING_Z, &Vertices2[0], VertexCount2);
-					
-					dGeomTriMeshDataBuildSimple(TriData2, (dReal*)Vertices2, VertexCount2, (dTriIndex*)Indices2, IndexCount2);
+					scaleBaseRadius(minRadius, minRadius, minRadius, Vertices1, VertexCount1);
+					//scaleBaseRadius(SCALING_X, SCALING_Y, SCALING_Z, &Vertices1[0], VertexCount1);
+
+					dGeomTriMeshDataBuildSimple(TriData2, (dReal*)Vertices1, VertexCount1, (dTriIndex*)Indices1, IndexCount1);
 					obj[i].geom[1] = dCreateTriMesh(space, TriData2, 0, 0, 0);
 					dGeomSetData(obj[i].geom[1], TriData2);
-					
-					////////////////////////////////////////////////////////////
+
 					/// calculate mass property of basement
 					dMassSetTrimesh(&m2, DENSITY, obj[i].geom[1]); /// temporary function
-					calModelProperty(minBH, minBR, m2,VertexCount2,IndexCount2,Vertices2,Indices2);
 					//dMass mBase;
 					//calBaseMass(baseMass,modelMass,modelSize);
 					//dMassSetParameters(&m2, m);
-					////////////////////////////////////////////////////////////
 					
 					dGeomSetPosition(obj[i].geom[1], m2.c[0], m2.c[1], m.c[2]);
 					//dMassTranslate(&m2, m2.c[0]*2, m2.c[1]*2, m2.c[2]*2);
@@ -627,9 +625,9 @@ static void command(int cmd) {
 				}
 				else if ( k == 2 ) {/// not use
 					TriData3 = dGeomTriMeshDataCreate();
-					stlLoad(baseWeightFile, VertexCount3, IndexCount3, &Indices3[0], &Vertices3[0], 1);
-					scaleBaseRadius(0.0001, 0.0001, 0.0001, Vertices3, VertexCount3);
-					dGeomTriMeshDataBuildSimple(TriData3, (dReal*)Vertices3, VertexCount3, (dTriIndex*)Indices3, IndexCount3);
+					stlLoad(baseWeightFile, VertexCount2, IndexCount2, &Indices2[0], &Vertices2[0], 1);
+					scaleBaseRadius(0.0001, 0.0001, 0.0001, Vertices2, VertexCount2);
+					dGeomTriMeshDataBuildSimple(TriData3, (dReal*)Vertices2, VertexCount2, (dTriIndex*)Indices2, IndexCount2);
 					obj[i].geom[2] = dCreateTriMesh(space, TriData3, 0, 0, 0);
 					dGeomSetData(obj[i].geom[2], TriData3);
 					dMassSetTrimesh(&m2, DENSITY, obj[i].geom[2]);
