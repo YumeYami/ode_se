@@ -106,8 +106,10 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 
 #define NUM 100			// max number of objects
 #define DENSITY (5.0)		// density of all objects
-#define DENSITY_BODY (0.2)
+#define DENSITY_MODEL (0.2)
+#define DENSITY_MODEL_FACE 5.0
 #define DENSITY_BASE (30.0)
+#define DENSITY_BASE_FACE 1.0
 #define GPB 3			// maximum number of geometries per body
 //#define PART_NUM 3
 #define PART_NUM 3
@@ -124,6 +126,7 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 
 /// calculation const
 #define MIN_HEIGHT_ERROR 0.05
+#define OBJECT_HEIGHT_FROM_MODEL_BASE -0.2
 
 /// file reading const
 #define MAX_VERTEX 9999
@@ -369,6 +372,51 @@ void calModelProperty(double &minHeight, double &minRadius, dMass m2, int Vertex
 	minRadius = sqrt(minRadius);
 }
 
+void calTrimeshFaceMass(dMass &mFace, int VertexCount, int IndexCount, dVector3* Vertices, int* Indices) {
+	mFace.setZero();
+	/// cal mass and cm
+	cout << "vertex count: " << VertexCount << "\n";
+	for ( int i = 0; i < VertexCount; i += 3 ) {
+		dMass tmp;
+		tmp.setZero();
+		dVector3 *va = &Vertices[i];
+		dVector3 *vb = &Vertices[i + 1];
+		dVector3 *vc = &Vertices[i + 2];
+		dVector3 v1 = {
+			*va[0] - *vb[0],
+			*va[1] - *vb[1],
+			*va[2] - *vb[2],
+			*va[3] - *vb[3]};
+		dVector3 v2 = {
+			*va[0] - *vc[0],
+			*va[1] - *vc[1],
+			*va[2] - *vc[2],
+			*va[3] - *vc[3]};
+		dVector3 vcross = {
+			v1[1] * v2[2] - v1[2] * v2[1],
+			v1[2] * v2[0] - v1[0] * v2[2],
+			v1[0] * v2[1] - v1[1] * v2[0],
+			0};
+		//cout << "vcross: " << vcross[0] << " " << vcross[1] << " " << vcross[2] << "\n";
+		dReal mass = (0.5 * sqrt(vcross[0] * vcross[0] + vcross[1] * vcross[1] + vcross[2] * vcross[2]) * MODEL_THICK * DENSITY_MODEL_FACE);
+		dVector3 cm = {
+			*va[0] + (v1[0] + v2[0]) / 2,
+			*va[1] + (v1[1] + v2[1]) / 2,
+			*va[2] + (v1[2] + v2[2]) / 2,
+			0};
+		dReal i0 = mass * SQR(cm[0]);
+		dReal i1 = mass * SQR(cm[1]);
+		dReal i2 = mass * SQR(cm[2]);
+		dMatrix3 I = {
+			i0, 0, 0, 0,
+			0, i1, 0, 0,
+			0, 0, i2, 0};
+		dMassSetParameters(&tmp, abs(mass), cm[0], cm[1], cm[2], i0, i1, i2, 0, 0, 0);
+		dMassAdd(&mFace, &tmp);
+		//cout << "mass: " << mass << "\n";
+	}
+}
+
 static void command(int cmd) {
 	size_t i;
 	int j, k;
@@ -582,9 +630,11 @@ static void command(int cmd) {
 					dMassSetTrimesh(&m2, DENSITY, obj[i].geom[0]);
 
 					/// cal triangle face property
-					//dMass mFace;
-					//calTrimeshFaceMass(mFace, VertexCount1, IndexCount1, Vertices1, Indices1);
-					//addMass(&m2,&mFace);
+					dMass mFace;
+					calTrimeshFaceMass(mFace, VertexCount0, IndexCount0, Vertices0, Indices0);
+					cout << "mFace: " << mFace.mass << "\n";
+					cout << "m2: " << m2.mass << "\n";
+					dMassAdd(&m2, &mFace);
 
 					/// cal model property
 					calModelProperty(minHeight, minRadius, m2, VertexCount0, IndexCount0, Vertices0, Indices0); /// calculate model for min height and radius(contact area)
@@ -614,11 +664,12 @@ static void command(int cmd) {
 					dGeomSetData(obj[i].geom[1], TriData2);
 
 					/// calculate mass property of basement
-					dMassSetTrimesh(&m2, DENSITY, obj[i].geom[1]); /// temporary function
-					//dMass mBase;
-					//calBaseMass(baseMass,modelMass,modelSize);
-					//dMassSetParameters(&m2, m);
-					
+					dMassSetTrimesh(&m2, DENSITY_BASE, obj[i].geom[1]); /// temporary function
+					{
+						dMass mBase;
+						//dMassSetParameters(&m2, m);
+					}
+
 					dGeomSetPosition(obj[i].geom[1], m2.c[0], m2.c[1], m.c[2]);
 					//dMassTranslate(&m2, m2.c[0]*2, m2.c[1]*2, m2.c[2]*2);
 					dRFromAxisAndAngle(drot[k], 0, -1, 0, M_PI_2);
