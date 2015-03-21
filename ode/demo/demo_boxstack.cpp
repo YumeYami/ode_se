@@ -108,7 +108,7 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 #define DENSITY (5.0)		// density of all objects
 #define DENSITY_MODEL (1.0)
 #define DENSITY_MODEL_FACE 5.0
-#define DENSITY_BASE (30.0)
+#define DENSITY_BASE (25.0)
 #define DENSITY_BASE_FACE 1.0
 #define GPB 3			// maximum number of geometries per body
 //#define PART_NUM 3
@@ -505,7 +505,7 @@ static void command(int cmd) {
 										   Sphere_pointcount,
 										   Sphere_polygons);
 #endif
-	}
+		}
 		//----> Convex Object
 		else if ( cmd == 'y' ) {
 			dMassSetCylinder(&m, DENSITY, 3, sides[0], sides[1]);
@@ -644,8 +644,10 @@ static void command(int cmd) {
 					/// cal triangle face property
 					dMass mFace;
 					calTrimeshFaceMass(mFace, VertexCount0, IndexCount0, Vertices0, Indices0);
-					cout << "mFace: " << mFace.mass << "\n";
-					cout << "m2: " << m2.mass << "\n";
+					cout << "face mass: " << mFace.mass << "\n";
+					cout << "model mass: " << m2.mass << "\n";
+					//cout << "face cm: " << mFace.c[0] << " " << mFace.c[1] << " " << mFace.c[2] << "\n";
+					//cout << "model cm: " << m2.c[0] << " " << m2.c[1] << " " << m2.c[2] << "\n";
 					dMassAdd(&m2, &mFace);
 
 					/// cal model property
@@ -668,8 +670,8 @@ static void command(int cmd) {
 					double minBH = 0, minBR = 0;
 
 					/// calculate case total cm == 0
-					double minBaseHeight = 2.0 / minRadius*sqrt(modelMass*abs(modelCmHeight) / DENSITY_BASE*M_PI);
-					cout << "minRadius " << minRadius << "\tmodelMass " << modelMass << "\tminHeight " << modelCmHeight << "\nbaseHeight " << minBaseHeight << "\n";
+					double minBaseHeight = 2.0 / minRadius * sqrt(modelMass * abs(modelCmHeight) / DENSITY_BASE / M_PI);
+					cout << "minRadius " << minRadius << "\tmodelMass " << modelMass << "\tmodelCmHeight " << modelCmHeight << " minBaseHeight " << minBaseHeight << "\n";
 					if ( minBaseHeight >= minRadius - BASE_HEIGHT_OFFSET ) {
 						cout << "cannot use these density to make rocking base\n";
 					}
@@ -677,7 +679,7 @@ static void command(int cmd) {
 						//binarySearchBaseSize(M_PI_4,minRadius,modelMass,modelCmHeight);
 					}
 					/// scaling the base size
-					scaleBaseRadius(minRadius, minRadius, minBaseHeight - BASE_HEIGHT_OFFSET, Vertices1, VertexCount1);
+					scaleBaseRadius(minRadius, minRadius, minBaseHeight + 1 * BASE_HEIGHT_OFFSET, Vertices1, VertexCount1);
 					//scaleBaseRadius(SCALING_X, SCALING_Y, SCALING_Z, &Vertices1[0], VertexCount1);
 
 					dGeomTriMeshDataBuildSimple(TriData2, (dReal*)Vertices1, VertexCount1, (dTriIndex*)Indices1, IndexCount1);
@@ -690,9 +692,10 @@ static void command(int cmd) {
 						dMass mBase;
 						//dMassSetParameters(&m2, m);
 					}
-
+					cout << "base mass: " << m2.mass << "\n";
+					cout << "base cm: " << m2.c[0] << " " << m2.c[1] << " " << m2.c[2] << "\n";
 					dGeomSetPosition(obj[i].geom[1], m2.c[0], m2.c[1], m.c[2]);
-					//dMassTranslate(&m2, m2.c[0]*2, m2.c[1]*2, m2.c[2]*2);
+					//dMassTranslate(&m2, -m2.c[0], -m2.c[1], -m2.c[2]);
 					dRFromAxisAndAngle(drot[k], 0, -1, 0, M_PI_2);
 				}
 				else if ( k == 2 ) {/// not use
@@ -702,7 +705,7 @@ static void command(int cmd) {
 					dGeomTriMeshDataBuildSimple(TriData3, (dReal*)Vertices2, VertexCount2, (dTriIndex*)Indices2, IndexCount2);
 					obj[i].geom[2] = dCreateTriMesh(space, TriData3, 0, 0, 0);
 					dGeomSetData(obj[i].geom[2], TriData3);
-					dMassSetTrimesh(&m2, DENSITY, obj[i].geom[2]);
+					dMassSetTrimesh(&m2, 0.00001, obj[i].geom[2]);
 					//dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
 					dGeomSetPosition(obj[i].geom[2], m2.c[0], m2.c[1], m.c[2]);
 					//dMassTranslate(&m2, -m2.c[0], -m2.c[1], -m2.c[2]);
@@ -862,7 +865,7 @@ static void command(int cmd) {
 		cout << "c7\n";
 		dBodySetMass(obj[i].body, &m);
 		cout << "c8\n";
-}
+	}
 
 	if ( cmd == ' ' ) {
 		selected++;
