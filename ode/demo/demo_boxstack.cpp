@@ -106,7 +106,7 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 
 #define NUM 100			// max number of objects
 #define DENSITY (5.0)		// density of all objects
-#define DENSITY_MODEL (0.2)
+#define DENSITY_MODEL (1.0)
 #define DENSITY_MODEL_FACE 5.0
 #define DENSITY_BASE (30.0)
 #define DENSITY_BASE_FACE 1.0
@@ -125,7 +125,7 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 #define MODEL_THICK 0.02
 
 /// calculation const
-#define MIN_HEIGHT_ERROR 0.05
+#define BASE_HEIGHT_OFFSET 0.05
 #define OBJECT_HEIGHT_FROM_MODEL_BASE -0.2
 
 /// file reading const
@@ -362,7 +362,7 @@ void calModelProperty(double &minHeight, double &minRadius, dMass m2, int Vertex
 	double cmx = m2.c[0], cmy = m2.c[1];
 	minRadius = 0;
 	for ( int i = 0; i < VertexCount; i++ ) {
-		if ( Vertices[i][2] < minHeight + MIN_HEIGHT_ERROR ) {
+		if ( Vertices[i][2] < minHeight + BASE_HEIGHT_OFFSET ) {
 			double radius = SQR(Vertices[i][0] - cmx) + SQR(Vertices[i][1] - cmy);
 			if ( radius > minRadius ) {
 				minRadius = radius;
@@ -399,14 +399,26 @@ void calTrimeshFaceMass(dMass &mFace, int VertexCount, int IndexCount, dVector3*
 			0};
 		//cout << "vcross: " << vcross[0] << " " << vcross[1] << " " << vcross[2] << "\n";
 		dReal mass = (0.5 * sqrt(vcross[0] * vcross[0] + vcross[1] * vcross[1] + vcross[2] * vcross[2]) * MODEL_THICK * DENSITY_MODEL_FACE);
+		if ( mass <= 0 ) {
+			continue;
+		}
 		dVector3 cm = {
 			*va[0] + (v1[0] + v2[0]) / 2,
 			*va[1] + (v1[1] + v2[1]) / 2,
 			*va[2] + (v1[2] + v2[2]) / 2,
 			0};
-		dReal i0 = mass * SQR(cm[0]);
-		dReal i1 = mass * SQR(cm[1]);
-		dReal i2 = mass * SQR(cm[2]);
+		dReal i0 = mass * sqrt(SQR(cm[1]) + SQR(cm[2]));
+		dReal i1 = mass * sqrt(SQR(cm[0]) + SQR(cm[2]));
+		dReal i2 = mass * sqrt(SQR(cm[1]) + SQR(cm[0]));
+		if ( i0 == 0 ) {
+			cout << "i0 inertia error\n";
+		}
+		if ( i1 == 0 ) {
+			cout << "i1 inertia error\n";
+		}
+		if ( i2 == 0 ) {
+			cout << "i2 inertia error\n";
+		}
 		dMatrix3 I = {
 			i0, 0, 0, 0,
 			0, i1, 0, 0,
@@ -449,10 +461,9 @@ static void command(int cmd) {
 
 		dMatrix3 R;
 		if ( random_pos ) {
-			dBodySetPosition(obj[i].body,
-							 dRandReal() * 2, dRandReal() * 2, dRandReal() + 1);
-			dRFromAxisAndAngle(R, dRandReal()*2.0 - 1.0, dRandReal()*2.0 - 1.0,
-							   dRandReal()*2.0 - 1.0, dRandReal()*10.0 - 5.0);
+			dBodySetPosition(obj[i].body, dRandReal() * 2, dRandReal() * 2, 1);
+			//dRFromAxisAndAngle(R, dRandReal()*2.0 - 1.0, dRandReal()*2.0 - 1.0, dRandReal()*2.0 - 1.0, dRandReal()*10.0 - 5.0);
+			dRFromAxisAndAngle(R, 1.0, 0.0, 0.0, M_PI_2);
 		}
 		else {
 			dReal maxheight = 0;
@@ -494,7 +505,7 @@ static void command(int cmd) {
 										   Sphere_pointcount,
 										   Sphere_polygons);
 #endif
-		}
+	}
 		//----> Convex Object
 		else if ( cmd == 'y' ) {
 			dMassSetCylinder(&m, DENSITY, 3, sides[0], sides[1]);
@@ -618,8 +629,9 @@ static void command(int cmd) {
 			dpos[0][2] = 0;
 			dpos[1][2] = -0.5;
 			dpos[2][2] = -0.5;
-			double minHeight = 0;
+			double modelCmHeight = 0;
 			double minRadius = 1;
+			double modelMass = 0;
 			for ( k = 0; k < PART_NUM; k++ ) {
 				if ( k == 0 ) {/// add model
 					TriData1 = dGeomTriMeshDataCreate();
@@ -627,7 +639,7 @@ static void command(int cmd) {
 					dGeomTriMeshDataBuildSimple(TriData1, (dReal*)Vertices0, VertexCount0, (dTriIndex*)Indices0, IndexCount0);
 					obj[i].geom[0] = dCreateTriMesh(space, TriData1, 0, 0, 0);
 					dGeomSetData(obj[i].geom[0], TriData1);
-					dMassSetTrimesh(&m2, DENSITY, obj[i].geom[0]);
+					dMassSetTrimesh(&m2, DENSITY_MODEL, obj[i].geom[0]);
 
 					/// cal triangle face property
 					dMass mFace;
@@ -637,15 +649,15 @@ static void command(int cmd) {
 					dMassAdd(&m2, &mFace);
 
 					/// cal model property
-					calModelProperty(minHeight, minRadius, m2, VertexCount0, IndexCount0, Vertices0, Indices0); /// calculate model for min height and radius(contact area)
+					calModelProperty(modelCmHeight, minRadius, m2, VertexCount0, IndexCount0, Vertices0, Indices0); /// calculate model for min height and radius(contact area)
 					dpos[1][0] = m2.c[0];
 					dpos[1][1] = m2.c[1];
-					dpos[1][2] = minHeight;
+					dpos[1][2] = modelCmHeight;
 					dpos[2][0] = m2.c[0];
 					dpos[2][1] = m2.c[1];
-					dpos[2][2] = minHeight;
-					cout << "minHeight: " << minHeight << " minRadius: " << minRadius << "\n";
-
+					dpos[2][2] = modelCmHeight;
+					cout << "minHeight: " << modelCmHeight << " minRadius: " << minRadius << "\n";
+					modelMass = m2.mass;
 					dGeomSetPosition(obj[i].geom[0], m2.c[0], m2.c[1], m.c[2]);
 					//dMassTranslate(&m2, -m2.c[0], -m2.c[1], -m2.c[2]);
 					dRFromAxisAndAngle(drot[k], 1, 1, 1, 0);
@@ -655,8 +667,17 @@ static void command(int cmd) {
 					stlLoad(baseModelFile, VertexCount1, IndexCount1, &Indices1[0], &Vertices1[0], 0);
 					double minBH = 0, minBR = 0;
 
+					/// calculate case total cm == 0
+					double minBaseHeight = 2.0 / minRadius*sqrt(modelMass*abs(modelCmHeight) / DENSITY_BASE*M_PI);
+					cout << "minRadius " << minRadius << "\tmodelMass " << modelMass << "\tminHeight " << modelCmHeight << "\nbaseHeight " << minBaseHeight << "\n";
+					if ( minBaseHeight >= minRadius - BASE_HEIGHT_OFFSET ) {
+						cout << "cannot use these density to make rocking base\n";
+					}
+					else {
+						//binarySearchBaseSize(M_PI_4,minRadius,modelMass,modelCmHeight);
+					}
 					/// scaling the base size
-					scaleBaseRadius(minRadius, minRadius, minRadius, Vertices1, VertexCount1);
+					scaleBaseRadius(minRadius, minRadius, minBaseHeight - BASE_HEIGHT_OFFSET, Vertices1, VertexCount1);
 					//scaleBaseRadius(SCALING_X, SCALING_Y, SCALING_Z, &Vertices1[0], VertexCount1);
 
 					dGeomTriMeshDataBuildSimple(TriData2, (dReal*)Vertices1, VertexCount1, (dTriIndex*)Indices1, IndexCount1);
@@ -841,7 +862,7 @@ static void command(int cmd) {
 		cout << "c7\n";
 		dBodySetMass(obj[i].body, &m);
 		cout << "c8\n";
-	}
+}
 
 	if ( cmd == ' ' ) {
 		selected++;
