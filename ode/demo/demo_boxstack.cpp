@@ -103,13 +103,9 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 #define CUBE(x) ((x)*(x)*(x))
 
 // some constants
-
 #define NUM 100			// max number of objects
 #define DENSITY (5.0)		// density of all objects
-#define DENSITY_MODEL (1.0)
-#define DENSITY_MODEL_FACE 5.0
-#define DENSITY_BASE (25.0)
-#define DENSITY_BASE_FACE 1.0
+
 #define GPB 3			// maximum number of geometries per body
 //#define PART_NUM 3
 #define PART_NUM 3
@@ -122,11 +118,22 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 #define SCALING_X 0.6
 #define SCALING_Y 0.6
 #define SCALING_Z 0.4
-#define MODEL_THICK 0.02
 
 /// calculation const
 #define BASE_HEIGHT_OFFSET 0.05
+#define MIN_BINARY_SEARCH 0.001
 #define OBJECT_HEIGHT_FROM_MODEL_BASE -0.2
+
+/// input const
+#define DENSITY_MODEL (1.0)
+#define DENSITY_MODEL_FACE 10.0
+#define DENSITY_BASE (10.0)
+#define DENSITY_BASE_FACE 1.0
+#define MODEL_THICK 0.1
+
+#define TILT_ANGLE (1.1)
+//#define TILT_ANGLE (M_PI_4 + M_PI/8)
+#define TILT_ANGLE_INIT (M_PI)
 
 /// file reading const
 #define MAX_VERTEX 9999
@@ -135,8 +142,6 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 #define baseModelFile "sphere_cut.stl"
 #define baseWeightFile "cube.stl"
 #define READ_CLOCKWISE 1
-//#define basefile "mons2.stl"
-//#define bodyfile "mons1.stl"
 
 // dynamics and collision objects
 
@@ -429,6 +434,27 @@ void calTrimeshFaceMass(dMass &mFace, int VertexCount, int IndexCount, dVector3*
 	}
 }
 
+void binarySearchBaseSize(double &minBaseHeight, double tiltAngle, double minRadius, double modelMass, double modelCmHeight) {
+	if ( tiltAngle >= M_PI_2 ) {
+		return;
+	}
+	double minB = BASE_HEIGHT_OFFSET, maxB = minBaseHeight;
+	while ( abs(minB - maxB) >= MIN_BINARY_SEARCH ) {
+		double tmpH = (minB + maxB) / 2;
+		double til = sqrt(SQR((modelMass + 2 / 3 * M_PI*minRadius*minRadius*tmpH) * (SQR(minRadius) - SQR(tmpH)) / (modelMass*modelCmHeight - M_PI / 4 * SQR(minRadius)*SQR(tmpH))) - SQR(tmpH)) / minRadius;
+		cout << "input: " << tiltAngle << " tilt: " << til << "\n";
+		if ( til < tiltAngle ) {
+			maxB = tmpH;
+		}
+		else {
+			minB = tmpH;
+		}
+		cout << "min: " << minB << " max: " << maxB << "\n";
+	}
+	minBaseHeight = maxB;
+	return;
+}
+
 static void command(int cmd) {
 	size_t i;
 	int j, k;
@@ -463,7 +489,7 @@ static void command(int cmd) {
 		if ( random_pos ) {
 			dBodySetPosition(obj[i].body, dRandReal() * 2, dRandReal() * 2, 1);
 			//dRFromAxisAndAngle(R, dRandReal()*2.0 - 1.0, dRandReal()*2.0 - 1.0, dRandReal()*2.0 - 1.0, dRandReal()*10.0 - 5.0);
-			dRFromAxisAndAngle(R, 1.0, 0.0, 0.0, M_PI_2);
+			dRFromAxisAndAngle(R, 1.0, 0.0, 0.0, TILT_ANGLE);
 		}
 		else {
 			dReal maxheight = 0;
@@ -505,7 +531,7 @@ static void command(int cmd) {
 										   Sphere_pointcount,
 										   Sphere_polygons);
 #endif
-		}
+	}
 		//----> Convex Object
 		else if ( cmd == 'y' ) {
 			dMassSetCylinder(&m, DENSITY, 3, sides[0], sides[1]);
@@ -670,16 +696,18 @@ static void command(int cmd) {
 					double minBH = 0, minBR = 0;
 
 					/// calculate case total cm == 0
-					double minBaseHeight = 2.0 / minRadius * sqrt(modelMass * abs(modelCmHeight) / DENSITY_BASE / M_PI);
-					cout << "minRadius " << minRadius << "\tmodelMass " << modelMass << "\tmodelCmHeight " << modelCmHeight << " minBaseHeight " << minBaseHeight << "\n";
-					if ( minBaseHeight >= minRadius - BASE_HEIGHT_OFFSET ) {
+					double baseHeight = 2.0 / minRadius * sqrt(modelMass * abs(modelCmHeight) / DENSITY_BASE / M_PI);
+					cout << "minRadius " << minRadius << "\tmodelMass " << modelMass << "\nmodelCmHeight " << modelCmHeight << "\tminBaseHeight " << baseHeight << "\n";
+					if ( baseHeight >= minRadius - BASE_HEIGHT_OFFSET ) {
 						cout << "cannot use these density to make rocking base\n";
 					}
 					else {
-						//binarySearchBaseSize(M_PI_4,minRadius,modelMass,modelCmHeight);
+						binarySearchBaseSize(baseHeight, TILT_ANGLE, minRadius, modelMass, modelCmHeight);
+						cout << "minBaseHeight: " << baseHeight << "\n";
 					}
+					cout << "cal base mass: " << DENSITY_BASE * 2 / 3 * M_PI * SQR(minRadius) * baseHeight << "\n";
 					/// scaling the base size
-					scaleBaseRadius(minRadius, minRadius, minBaseHeight + 1 * BASE_HEIGHT_OFFSET, Vertices1, VertexCount1);
+					scaleBaseRadius(minRadius, minRadius, baseHeight -2 * BASE_HEIGHT_OFFSET, Vertices1, VertexCount1);
 					//scaleBaseRadius(SCALING_X, SCALING_Y, SCALING_Z, &Vertices1[0], VertexCount1);
 
 					dGeomTriMeshDataBuildSimple(TriData2, (dReal*)Vertices1, VertexCount1, (dTriIndex*)Indices1, IndexCount1);
@@ -865,7 +893,7 @@ static void command(int cmd) {
 		cout << "c7\n";
 		dBodySetMass(obj[i].body, &m);
 		cout << "c8\n";
-	}
+}
 
 	if ( cmd == ' ' ) {
 		selected++;
@@ -946,7 +974,7 @@ void drawGeom(dGeomID g, const dReal *pos, const dReal *R, int show_aabb) {
 					 Sphere_pointcount,
 					 Sphere_polygons);
 #endif
-	}
+}
 	//----> Convex Object
 	else if ( type == dCylinderClass ) {
 		dReal radius, length;
