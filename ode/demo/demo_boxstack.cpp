@@ -138,7 +138,7 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 /// file reading const
 #define MAX_VERTEX 9999
 #define MAX_INDEX 9999
-#define modelFile "mons1.stl"
+#define modelFile "mons1.1.stl"
 #define baseModelFile "sphere_cut.stl"
 #define baseWeightFile "cube.stl"
 #define READ_CLOCKWISE 1
@@ -219,7 +219,7 @@ static void nearCallback(void *data, dGeomID o1, dGeomID o2) {
 static void start() {
 	dAllocateODEDataForThread(dAllocateMaskAll);
 
-	static float xyz[3] = {2.1640f, -1.3079f, 1.7600f};
+	static float xyz[3] = {60.40f, -60.79f, 60.00f};
 	static float hpr[3] = {125.5000f, -17.0000f, 0.0000f};
 	dsSetViewpoint(xyz, hpr);
 	printf("To drop another object, press:\n");
@@ -487,7 +487,7 @@ static void command(int cmd) {
 
 		dMatrix3 R;
 		if ( random_pos ) {
-			dBodySetPosition(obj[i].body, dRandReal() * 2, dRandReal() * 2, 1);
+			dBodySetPosition(obj[i].body, dRandReal() * 2, dRandReal() * 2, 100);
 			//dRFromAxisAndAngle(R, dRandReal()*2.0 - 1.0, dRandReal()*2.0 - 1.0, dRandReal()*2.0 - 1.0, dRandReal()*10.0 - 5.0);
 			dRFromAxisAndAngle(R, 1.0, 0.0, 0.0, TILT_ANGLE);
 		}
