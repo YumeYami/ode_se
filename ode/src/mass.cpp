@@ -75,7 +75,7 @@ int dMassCheck (const dMass *m)
     for (i=4; i<7; i++) I2[i] = m->I[i] + m->mass*I2[i];
     for (i=8; i<11; i++) I2[i] = m->I[i] + m->mass*I2[i];
     if (!dIsPositiveDefinite (I2,3,NULL)) {
-        dDEBUGMSG ("center of mass inconsistent with mass parameters");
+        //dDEBUGMSG ("center of mass inconsistent with mass parameters");
         return 0;
     }
     return 1;
