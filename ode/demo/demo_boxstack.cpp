@@ -122,10 +122,15 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 /// input const
 #define MODEL_SCALING_FACTOR (1.0/10.0)
 #define DENSITY_MODEL 0.1
-#define DENSITY_MODEL_FACE 1.0
+#define DENSITY_MODEL_FACE 1.380386254
 #define DENSITY_BASE 1.0
-#define DENSITY_BASE_FACE 1.0
-#define MODEL_THICK 1.95*2*MODEL_SCALING_FACTOR
+#define DENSITY_BASE_FACE 1.380386254
+#define MODEL_THICK 1.130922896*MODEL_SCALING_FACTOR
+/// iron 110g/100 = 
+///		0.00820489234215678779661524500649 g/mm^3
+/// PLA = 
+///		0.0013753128593654873841574781844 g/mm^3
+/// iron/PLA = 5.9658369994025843958125135902092
 
 /// calculation const
 #define BASE_HEIGHT_OFFSET 2.0*MODEL_SCALING_FACTOR
@@ -134,7 +139,7 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 
 //#define TILT_ANGLE (1.1)
 #define START_HEIGHT 4.0
-#define TILT_ANGLE (M_PI_4 + M_PI/8)
+#define TILT_ANGLE (M_PI_4 + M_PI/4 - 0.1)
 #define TILT_ANGLE_INIT (M_PI)
 
 /// file reading const
@@ -352,7 +357,7 @@ void calModelProperty(double &minHeight, double &minRadius, dMass m2, int Vertex
 	// 	minHeight += m2.c[2];
 }
 
-void calTrimeshFaceMass(dMass &mFace, int VertexCount, int IndexCount, dVector3* Vertices, int* Indices) {
+void calTrimeshFaceMass(dMass &mFace, dReal modelThickness, dReal densityModelFace, int VertexCount, int IndexCount, dVector3* Vertices, int* Indices) {
 	mFace.setZero();
 	/// cal mass and cm
 	cout << "vertex count: " << VertexCount << "\n";
@@ -378,7 +383,7 @@ void calTrimeshFaceMass(dMass &mFace, int VertexCount, int IndexCount, dVector3*
 			v1[0] * v2[1] - v1[1] * v2[0],
 			0};
 		//cout << "vcross: " << vcross[0] << " " << vcross[1] << " " << vcross[2] << "\n";
-		dReal mass = (0.5 * sqrt(vcross[0] * vcross[0] + vcross[1] * vcross[1] + vcross[2] * vcross[2]) * MODEL_THICK * DENSITY_MODEL_FACE);
+		dReal mass = (0.5 * sqrt(vcross[0] * vcross[0] + vcross[1] * vcross[1] + vcross[2] * vcross[2]) * modelThickness * densityModelFace);
 		if ( mass <= 0 ) {
 			continue;
 		}
@@ -411,7 +416,7 @@ void calTrimeshFaceMass(dMass &mFace, int VertexCount, int IndexCount, dVector3*
 }
 
 void binarySearchBaseSize(double &minBaseHeight, double tiltAngle, double minRadius, double modelMass, double modelCmHeight) {
-	if ( tiltAngle >= M_PI_2) {
+	if ( tiltAngle >= M_PI_2 ) {
 		return;
 	}
 	double minB = BASE_HEIGHT_OFFSET, maxB = minBaseHeight;
@@ -434,6 +439,13 @@ void binarySearchBaseSize(double &minBaseHeight, double tiltAngle, double minRad
 		cout << "input: " << tiltAngle << " tilt: " << til << "\n";
 	}
 	minBaseHeight = maxB;
+	double bh = 0.01;
+	while ( bh < minRadius ) {
+		double til = sqrt(SQR((modelMass + 2 / 3 * M_PI*minRadius*minRadius*bh*DENSITY_BASE) * (SQR(minRadius) - SQR(bh)) / (modelMass*modelCmHeight - M_PI / 4 * SQR(minRadius)*SQR(bh)*DENSITY_BASE)) - SQR(bh)) / minRadius;
+		double ch = (SQR(minRadius) - SQR(bh)) / sqrt(SQR(til*minRadius) + SQR(bh));
+		cout << "bh: " << bh << " tilt: " << til << " ch: " << ch << "\n";
+		bh += 0.02;
+	}
 	return;
 }
 
@@ -655,10 +667,11 @@ static void command(int cmd) {
 
 					/// set model mass
 					dMassSetTrimesh(&m2, DENSITY_MODEL, obj[i].geom[0]);
-
+					cout << "volume: " << m2.mass << "\n";
+					dMassSetTrimesh(&m2, 0.1, obj[i].geom[0]);
 					/// calculate triangle face property
 					dMass mFace;
-					calTrimeshFaceMass(mFace, VertexCount0, IndexCount0, Vertices0, Indices0);
+					calTrimeshFaceMass(mFace, MODEL_THICK, DENSITY_MODEL_FACE, VertexCount0, IndexCount0, Vertices0, Indices0);
 					cout << "face mass: " << mFace.mass << "\n";
 					cout << "model mass: " << m2.mass << "\n";
 					//cout << "face cm: " << mFace.c[0] << " " << mFace.c[1] << " " << mFace.c[2] << "\n";
@@ -698,7 +711,7 @@ static void command(int cmd) {
 					}
 					cout << "cal base mass: " << DENSITY_BASE * 2 / 3 * M_PI * SQR(minRadius) * baseHeight << "\n";
 					/// scaling the base size
-					scaleMesh(minRadius, minRadius, baseHeight + 1 * BASE_HEIGHT_OFFSET, Vertices1, VertexCount1);
+					scaleMesh(minRadius, minRadius, baseHeight + 0 * BASE_HEIGHT_OFFSET, Vertices1, VertexCount1);
 					//scaleBaseRadius(SCALING_X, SCALING_Y, SCALING_Z, &Vertices1[0], VertexCount1);
 
 					dGeomTriMeshDataBuildSimple(TriData2, (dReal*)Vertices1, VertexCount1, (dTriIndex*)Indices1, IndexCount1);
