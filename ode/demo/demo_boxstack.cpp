@@ -114,15 +114,11 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 #define GRAVITY         REAL(0.5)
 #define USE_GEOM_OFFSET 1
 
-/// base const
-#define SCALING_X 0.6
-#define SCALING_Y 0.6
-#define SCALING_Z 0.4
-
 /// input const
 #define MODEL_SCALING_FACTOR (1.0/10.0)
+
 #define DENSITY_MODEL_FACE	1.380386254
-#define DENSITY_MODEL		0.208269525*DENSITY_MODEL_FACE * 0
+#define DENSITY_MODEL		0.8*DENSITY_MODEL_FACE
 
 #define DENSITY_BASE_FACE	1.380386254
 #define DENSITY_BASE		1.380386254
@@ -137,14 +133,12 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 /// calculation const
 #define BASE_HEIGHT_OFFSET		2.0*MODEL_SCALING_FACTOR
 #define BASE_ERROR_OFFSET		1.0*MODEL_SCALING_FACTOR
-#define MIN_BINARY_SEARCH 0.0001
-#define OBJECT_HEIGHT_FROM_MODEL_BASE -0.2
+#define MIN_BINARY_SEARCH		0.0001
 
-//#define TILT_ANGLE (1.1)
-#define START_HEIGHT 4.0
-//#define TILT_ANGLE (M_PI_4 + M_PI/4)
-#define TILT_ANGLE 75.0/180*M_PI
-#define TILT_ANGLE_INIT (M_PI)
+#define START_HEIGHT		3.0
+//#define TILT_ANGLE		(M_PI_4 + M_PI/4)
+#define TILT_ANGLE			75.0/180*M_PI
+#define TILT_ANGLE_INIT		TILT_ANGLE + 0.1
 
 /// file reading const
 #define MAX_VERTEX 9999
@@ -271,15 +265,12 @@ int Indices2[MAX_INDEX];
 
 void stlLoad(string fileName, int &VertexCount, int &IndexCount, int* Indices, dVector3* Vertices, int reading_method) {
 	cout << "\nstart loading " << fileName << "\n";
-	/// build trimesh data
 	long i = 0;
 	ifstream file;
 	file.open(fileName);
 	if ( file.is_open() ) {
-
 		string line;
 		getline(file, line);
-		//cout << line;
 		istringstream iss(line);
 		string word;
 		iss >> word;
@@ -318,7 +309,6 @@ void stlLoad(string fileName, int &VertexCount, int &IndexCount, int* Indices, d
 			for ( int j = 0; j < 3; j++ ) {
 				Indices[IndexCount] = IndexCount;
 				IndexCount++;
-				//cout << "vertex " << i + j << ": " << Vertices[i + j][0] << "\t" << Vertices[i + j][1] << "\t" << Vertices[i + j][2] << "\n";
 			}
 			i += 3;
 			if ( IndexCount >= MAX_INDEX - 9 ) {
@@ -327,7 +317,6 @@ void stlLoad(string fileName, int &VertexCount, int &IndexCount, int* Indices, d
 			}
 		}
 		VertexCount = i;
-		//cout << "vertex: " << VertexCount << "\n index: " << IndexCount << "\n";
 	}
 	file.close();
 }
@@ -363,7 +352,6 @@ void calModelProperty(double &minHeight, double &minRadius, dMass m2, int Vertex
 
 void calTrimeshFaceMass(dMass &mFace, dReal modelThickness, dReal densityModelFace, int VertexCount, int IndexCount, dVector3* Vertices, int* Indices) {
 	mFace.setZero();
-	/// cal mass and cm
 	cout << "vertex count: " << VertexCount << "\n";
 	for ( int i = 0; i < VertexCount; i += 3 ) {
 		dMass tmp;
@@ -441,7 +429,7 @@ void binarySearchBaseSize(double &baseHeight, double tiltAngle, double minRadius
 	while ( til_rad > tiltAngle ) {
 		minB -= 0.02;
 		m2 = 2.0 / 3 * M_PI*SQR(minRadius)*minB*DENSITY_BASE;
-		h = (modelMass*modelCmHeight - m2 * 3 / 8 * minB);
+		h = (modelMass*modelCmHeight - m2 * 3 / 8 * minB) / (modelMass + m2);
 		til = sqrt(SQR((SQR(minRadius) - SQR(minB)) / h) - SQR(minB)) / minRadius;
 		til_rad = atan(til);
 		cout << "til_rad " << til_rad << "\n";
@@ -449,12 +437,13 @@ void binarySearchBaseSize(double &baseHeight, double tiltAngle, double minRadius
 	while ( abs(minB - maxB) >= MIN_BINARY_SEARCH ) {
 		double tmpH = (minB + maxB) / 2;
 		m2 = 2.0 / 3 * M_PI*SQR(minRadius)*tmpH*DENSITY_BASE;
-		h = (modelMass*modelCmHeight - m2 * 3 / 8 * tmpH);
+		h = (modelMass*modelCmHeight - m2 * 3 / 8 * tmpH) / (modelMass + m2);
 		til = sqrt(SQR((SQR(minRadius) - SQR(tmpH)) / h) - SQR(tmpH)) / minRadius;
 		til_rad = atan(til);
 		cout << "min: " << minB << " tmpH: " << tmpH << " max: " << maxB << "\n";
 		if ( til_rad != til_rad ) {
 			cout << "error---------------------------------------\n";
+			break;
 		}
 		else if ( til_rad > tiltAngle ) {
 			maxB = tmpH;
@@ -467,13 +456,13 @@ void binarySearchBaseSize(double &baseHeight, double tiltAngle, double minRadius
 		}
 		cout << "input: " << tiltAngle << " tilt: " << atan(til) << "\n";
 	}
-	baseHeight = maxB;
+	baseHeight = minB;
 
 	/// debugging section
 	double bh = 0.01;
 	while ( bh < minRadius ) {
 		m2 = 2.0 / 3 * M_PI*SQR(minRadius)*bh*DENSITY_BASE;
-		h = (modelMass*modelCmHeight - m2 * 3 / 8 * bh);
+		h = (modelMass*modelCmHeight - m2 * 3 / 8 * bh) / (modelMass + m2);
 		til = sqrt(SQR((SQR(minRadius) - SQR(bh)) / h) - SQR(bh)) / minRadius;
 		cout << "bh: " << bh << " m2: " << m2 << " h: " << h << " til: " << til << "\n";
 		//cout << "bh: " << bh << " \ttan: " << til << " \tangle: " << atan(til) << " \tangle(d): " << atan(til) * 180 / M_PI << "\n";
@@ -515,7 +504,7 @@ static void command(int cmd) {
 		if ( random_pos ) {
 			dBodySetPosition(obj[i].body, dRandReal() * 2, dRandReal() * 2, START_HEIGHT);
 			//dRFromAxisAndAngle(R, dRandReal()*2.0 - 1.0, dRandReal()*2.0 - 1.0, dRandReal()*2.0 - 1.0, dRandReal()*10.0 - 5.0);
-			dRFromAxisAndAngle(R, 1.0, 0.0, 0.0, TILT_ANGLE);
+			dRFromAxisAndAngle(R, 1.0, 0.0, 0.0, TILT_ANGLE_INIT);
 		}
 		else {
 			dReal maxheight = 0;
@@ -697,7 +686,7 @@ static void command(int cmd) {
 					obj[i].geom[0] = dCreateTriMesh(space, TriData1, 0, 0, 0);
 					dGeomSetData(obj[i].geom[0], TriData1);
 					if ( DENSITY_MODEL != 0 ) {
-						dMassSetTrimesh(&m2, DENSITY_MODEL_FACE, obj[i].geom[0]);
+						dMassSetTrimesh(&m2, DENSITY_MODEL, obj[i].geom[0]);
 					}
 					/// calculate triangle face property
 					dMass mFace;
@@ -729,16 +718,16 @@ static void command(int cmd) {
 					/// calculate case total cm == 0
 					double baseHeight = 2.0 / minRadius * sqrt(modelMass * abs(modelCmHeight) / DENSITY_BASE / M_PI);
 					cout << "minRadius " << minRadius << "\tmodelMass " << modelMass << "\nmodelCmHeight " << modelCmHeight << "\tmaxBaseHeight " << baseHeight << "\n";
-					if ( baseHeight >= minRadius - BASE_HEIGHT_OFFSET ) {
+					if ( baseHeight >= minRadius ) {
 						cout << "cannot use these density and angle to make rocking base\n";
 					}
 					else {
 						binarySearchBaseSize(baseHeight, TILT_ANGLE, minRadius, modelMass, modelCmHeight);
-						cout << "minBaseHeight: " << baseHeight << "\n";
+						cout << "searched base height: " << baseHeight << "\n";
 					}
 					/// scaling the base size
 					{
-						//baseHeight += BASE_ERROR_OFFSET * 4;
+						//baseHeight -= BASE_ERROR_OFFSET * 4;
 						scaleMesh(minRadius, minRadius, baseHeight, Vertices1, VertexCount1);
 					}
 					dGeomTriMeshDataBuildSimple(TriData2, (dReal*)Vertices1, VertexCount1, (dTriIndex*)Indices1, IndexCount1);
