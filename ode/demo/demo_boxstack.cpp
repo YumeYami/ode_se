@@ -123,7 +123,7 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 #define DENSITY_BASE_FACE	1.380386254
 #define DENSITY_BASE		1.380386254
 
-#define MODEL_THICK			1.130922896*MODEL_SCALING_FACTOR
+#define MODEL_THICK			0.735921418*MODEL_SCALING_FACTOR
 /// iron 110g/100 = 
 ///		0.00820489234215678779661524500649 g/mm^3
 /// PLA = 
@@ -318,14 +318,15 @@ void stlLoad(string fileName, int &VertexCount, int &IndexCount, int* Indices, d
 		}
 		VertexCount = i;
 	}
+	cout << "index " << IndexCount << " vertex " << VertexCount << "\n";
 	file.close();
 }
 
 void scaleMesh(double x, double y, double z, dVector3* Vertices, int VertexCount) {
 	for ( int i = 0; i < VertexCount; i++ ) {
-		Vertices[i][2] *= x;
+		Vertices[i][0] *= x;
 		Vertices[i][1] *= y;
-		Vertices[i][0] *= z;
+		Vertices[i][2] *= z;
 	}
 }
 
@@ -359,16 +360,22 @@ void calTrimeshFaceMass(dMass &mFace, dReal modelThickness, dReal densityModelFa
 		dVector3 *va = &Vertices[i];
 		dVector3 *vb = &Vertices[i + 1];
 		dVector3 *vc = &Vertices[i + 2];
+		if ( i == 0 ) {
+			cout << "va[0] " << (*va)[0] << " va[1] " << (*va)[1] << " va[2] " << (*va)[2] << "\n";
+			cout << "vb[0] " << (*vb)[0] << " vb[1] " << (*vb)[1] << " vb[2] " << (*vb)[2] << "\n";
+			cout << "vc[0] " << (*vc)[0] << " vc[1] " << (*vc)[1] << " vc[2] " << (*vc)[2] << "\n\n";
+
+		}
 		dVector3 v1 = {
-			*va[0] - *vb[0],
-			*va[1] - *vb[1],
-			*va[2] - *vb[2],
-			*va[3] - *vb[3]};
+			(*va)[0] - (*vb)[0],
+			(*va)[1] - (*vb)[1],
+			(*va)[2] - (*vb)[2],
+			(*va)[3] - (*vb)[3]};
 		dVector3 v2 = {
-			*va[0] - *vc[0],
-			*va[1] - *vc[1],
-			*va[2] - *vc[2],
-			*va[3] - *vc[3]};
+			(*va)[0] - (*vc)[0],
+			(*va)[1] - (*vc)[1],
+			(*va)[2] - (*vc)[2],
+			(*va)[3] - (*vc)[3]};
 		dVector3 vcross = {
 			v1[1] * v2[2] - v1[2] * v2[1],
 			v1[2] * v2[0] - v1[0] * v2[2],
@@ -380,9 +387,9 @@ void calTrimeshFaceMass(dMass &mFace, dReal modelThickness, dReal densityModelFa
 			continue;
 		}
 		dVector3 cm = {
-			*va[0] + (v1[0] + v2[0]) / 2,
-			*va[1] + (v1[1] + v2[1]) / 2,
-			*va[2] + (v1[2] + v2[2]) / 2,
+			(*va)[0] + (v1[0] + v2[0]) / 2,
+			(*va)[1] + (v1[1] + v2[1]) / 2,
+			(*va)[2] + (v1[2] + v2[2]) / 2,
 			0};
 		dReal i11 = mass * (SQR(cm[1]) + SQR(cm[2]));
 		dReal i22 = mass * (SQR(cm[0]) + SQR(cm[2]));
@@ -405,6 +412,10 @@ void calTrimeshFaceMass(dMass &mFace, dReal modelThickness, dReal densityModelFa
 		dMassAdd(&mFace, &tmp);
 		//cout << "mass: " << mass << "\n";
 	}
+}
+
+void calBaseMass() {
+
 }
 
 void binarySearchBaseSize(double &baseHeight, double tiltAngle, double minRadius, double modelMass, double modelCmHeight) {
@@ -672,15 +683,18 @@ static void command(int cmd) {
 			dpos[2][2] = -0.5;
 			double modelCmHeight = 0;
 			double minRadius = 1;
+			double maxRadius = 1;
 			double modelMass = 0;
 			///--------------------------------------------------------------------------------------------------------- add model
+			bool baseSizeMode = 0; /// 0 for normal, 1 for too heavy model
 			for ( k = 0; k < PART_NUM; k++ ) {
 				if ( k == 0 ) {/// add model
 					TriData1 = dGeomTriMeshDataCreate();
 					/// load and scale model 
 					stlLoad(MODEL_FILE, VertexCount0, IndexCount0, &Indices0[0], &Vertices0[0], 1);
-					scaleMesh(MODEL_SCALING_FACTOR, MODEL_SCALING_FACTOR, MODEL_SCALING_FACTOR, Vertices0, VertexCount0);
-
+					scaleMesh(MODEL_SCALING_FACTOR, MODEL_SCALING_FACTOR, MODEL_SCALING_FACTOR*1.5, Vertices0, VertexCount0);
+					dMass mFace;
+					calTrimeshFaceMass(mFace, MODEL_THICK, DENSITY_MODEL_FACE, VertexCount0, IndexCount0, Vertices0, Indices0);
 					/// build mesh data
 					dGeomTriMeshDataBuildSimple(TriData1, (dReal*)Vertices0, VertexCount0, (dTriIndex*)Indices0, IndexCount0);
 					obj[i].geom[0] = dCreateTriMesh(space, TriData1, 0, 0, 0);
@@ -689,8 +703,6 @@ static void command(int cmd) {
 						dMassSetTrimesh(&m2, DENSITY_MODEL, obj[i].geom[0]);
 					}
 					/// calculate triangle face property
-					dMass mFace;
-					calTrimeshFaceMass(mFace, MODEL_THICK, DENSITY_MODEL_FACE, VertexCount0, IndexCount0, Vertices0, Indices0);
 					cout << "\nface mass: " << mFace.mass << "\n";
 					cout << "model mass: " << m2.mass << "\n";
 					dMassAdd(&m2, &mFace);
@@ -722,13 +734,13 @@ static void command(int cmd) {
 						cout << "cannot use these density and angle to make rocking base\n";
 					}
 					else {
-						binarySearchBaseSize(baseHeight, TILT_ANGLE, minRadius, modelMass, modelCmHeight);
+						//binarySearchBaseSize(baseHeight, TILT_ANGLE, minRadius, modelMass, modelCmHeight);
 						cout << "searched base height: " << baseHeight << "\n";
 					}
 					/// scaling the base size
 					{
 						//baseHeight -= BASE_ERROR_OFFSET * 4;
-						scaleMesh(minRadius, minRadius, baseHeight, Vertices1, VertexCount1);
+						scaleMesh(baseHeight, minRadius, minRadius, Vertices1, VertexCount1);
 					}
 					dGeomTriMeshDataBuildSimple(TriData2, (dReal*)Vertices1, VertexCount1, (dTriIndex*)Indices1, IndexCount1);
 					obj[i].geom[1] = dCreateTriMesh(space, TriData2, 0, 0, 0);
@@ -744,11 +756,6 @@ static void command(int cmd) {
 						dReal i22 = i11;
 						dReal i33 = basemass / 5.0 * 2.0 * SQR(minRadius);
 						m2.setParameters(basemass, -gz, 0.0, 0.0, i33, i22, i11, 0, 0, 0);
-						// 						cout << "cm: " << m2.c[0] << " " << m2.c[1] << " " << m2.c[2] << "\n";
-						// 						cout << "I: ";
-						// 						for ( int i = 0; i < 12; i++ ) {
-						// 							cout << m2.I[i] << " ";
-						// 						}
 					}
 					dGeomSetPosition(obj[i].geom[1], m2.c[0], m2.c[1], m.c[2]);
 					//dMassTranslate(&m2, -m2.c[0], -m2.c[1], -m2.c[2]);
