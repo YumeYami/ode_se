@@ -124,6 +124,7 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 #define DENSITY_BASE		1.380386254
 
 #define MODEL_THICK			0.735921418*MODEL_SCALING_FACTOR
+#define USE_2_DENSIDY		0
 /// iron 110g/100 = 
 ///		0.00820489234215678779661524500649 g/mm^3
 /// PLA = 
@@ -132,10 +133,10 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 
 /// calculation const
 #define BASE_HEIGHT_OFFSET		2.0*MODEL_SCALING_FACTOR
-#define BASE_ERROR_OFFSET		1.0*MODEL_SCALING_FACTOR
+#define BASE_ERROR_OFFSET		2.0*MODEL_SCALING_FACTOR
 #define MIN_BINARY_SEARCH		0.0001
 
-#define START_HEIGHT		3.0
+#define START_HEIGHT		4.0
 //#define TILT_ANGLE		(M_PI_4 + M_PI/4)
 #define TILT_ANGLE			75.0/180*M_PI
 #define TILT_ANGLE_INIT		TILT_ANGLE + 0.1
@@ -340,7 +341,7 @@ void calModelProperty(double &minHeight, double &minRadius, dMass m2, int Vertex
 	double cmx = m2.c[0], cmy = m2.c[1];
 	minRadius = 0;
 	for ( int i = 0; i < VertexCount; i++ ) {
-		if ( Vertices[i][2] < minHeight + BASE_HEIGHT_OFFSET ) {
+		if ( Vertices[i][2] < minHeight + BASE_ERROR_OFFSET ) {
 			double radius = SQR(Vertices[i][0] - cmx) + SQR(Vertices[i][1] - cmy);
 			if ( radius > minRadius ) {
 				minRadius = radius;
@@ -360,12 +361,12 @@ void calTrimeshFaceMass(dMass &mFace, dReal modelThickness, dReal densityModelFa
 		dVector3 *va = &Vertices[i];
 		dVector3 *vb = &Vertices[i + 1];
 		dVector3 *vc = &Vertices[i + 2];
-		if ( i == 0 ) {
-			cout << "va[0] " << (*va)[0] << " va[1] " << (*va)[1] << " va[2] " << (*va)[2] << "\n";
-			cout << "vb[0] " << (*vb)[0] << " vb[1] " << (*vb)[1] << " vb[2] " << (*vb)[2] << "\n";
-			cout << "vc[0] " << (*vc)[0] << " vc[1] " << (*vc)[1] << " vc[2] " << (*vc)[2] << "\n\n";
+		//if ( i == 0 ) {
+		//	cout << "va[0] " << (*va)[0] << " va[1] " << (*va)[1] << " va[2] " << (*va)[2] << "\n";
+		//	cout << "vb[0] " << (*vb)[0] << " vb[1] " << (*vb)[1] << " vb[2] " << (*vb)[2] << "\n";
+		//	cout << "vc[0] " << (*vc)[0] << " vc[1] " << (*vc)[1] << " vc[2] " << (*vc)[2] << "\n\n";
 
-		}
+		//}
 		dVector3 v1 = {
 			(*va)[0] - (*vb)[0],
 			(*va)[1] - (*vb)[1],
@@ -387,9 +388,9 @@ void calTrimeshFaceMass(dMass &mFace, dReal modelThickness, dReal densityModelFa
 			continue;
 		}
 		dVector3 cm = {
-			(*va)[0] + (v1[0] + v2[0]) / 2,
-			(*va)[1] + (v1[1] + v2[1]) / 2,
-			(*va)[2] + (v1[2] + v2[2]) / 2,
+			(*va)[0] + (v1[0] + v2[0]) / 3,
+			(*va)[1] + (v1[1] + v2[1]) / 3,
+			(*va)[2] + (v1[2] + v2[2]) / 3,
 			0};
 		dReal i11 = mass * (SQR(cm[1]) + SQR(cm[2]));
 		dReal i22 = mass * (SQR(cm[0]) + SQR(cm[2]));
@@ -414,11 +415,7 @@ void calTrimeshFaceMass(dMass &mFace, dReal modelThickness, dReal densityModelFa
 	}
 }
 
-void calBaseMass() {
-
-}
-
-void binarySearchBaseSize(double &baseHeight, double tiltAngle, double minRadius, double modelMass, double modelCmHeight) {
+void binarySearchBaseHeight(double &baseHeight, double tiltAngle, double minRadius, double modelMass, double modelCmHeight) {
 	if ( tiltAngle >= M_PI_2 ) {
 		return;
 	}
@@ -692,7 +689,7 @@ static void command(int cmd) {
 					TriData1 = dGeomTriMeshDataCreate();
 					/// load and scale model 
 					stlLoad(MODEL_FILE, VertexCount0, IndexCount0, &Indices0[0], &Vertices0[0], 1);
-					scaleMesh(MODEL_SCALING_FACTOR, MODEL_SCALING_FACTOR, MODEL_SCALING_FACTOR*1.5, Vertices0, VertexCount0);
+					scaleMesh(MODEL_SCALING_FACTOR, MODEL_SCALING_FACTOR, MODEL_SCALING_FACTOR, Vertices0, VertexCount0);
 					dMass mFace;
 					calTrimeshFaceMass(mFace, MODEL_THICK, DENSITY_MODEL_FACE, VertexCount0, IndexCount0, Vertices0, Indices0);
 					/// build mesh data
@@ -722,25 +719,26 @@ static void command(int cmd) {
 				}
 				else if ( k == 1 ) {/// add base
 					TriData2 = dGeomTriMeshDataCreate();
-
 					/// load and scale base size
 					stlLoad(BASE_MESH_FILE, VertexCount1, IndexCount1, &Indices1[0], &Vertices1[0], 0);
-					double minBH = 0, minBR = 0;
+					
+					double baseHeight;
+					//calculateBaseDensity;
+					baseHeight = 2.0 / minRadius * sqrt(modelMass * abs(modelCmHeight) / DENSITY_BASE / M_PI);
 
-					/// calculate case total cm == 0
-					double baseHeight = 2.0 / minRadius * sqrt(modelMass * abs(modelCmHeight) / DENSITY_BASE / M_PI);
 					cout << "minRadius " << minRadius << "\tmodelMass " << modelMass << "\nmodelCmHeight " << modelCmHeight << "\tmaxBaseHeight " << baseHeight << "\n";
 					if ( baseHeight >= minRadius ) {
-						cout << "cannot use these density and angle to make rocking base\n";
+						//cout << "cannot use these density and angle to make rocking base\n";
+						maxRadius = sqrt(sqrt(4.0 / M_PI*modelMass*abs(modelCmHeight)));
+						maxRadius += BASE_HEIGHT_OFFSET;
+						cout << "max radius: " << maxRadius << "\n";
+						scaleMesh(maxRadius - BASE_HEIGHT_OFFSET, maxRadius, maxRadius, Vertices1, VertexCount1);
+						//binarySearchBaseSize(baseHeight, TILT_ANGLE, minRadius, maxRadius, modelMass, modelCmHeight);
 					}
 					else {
-						//binarySearchBaseSize(baseHeight, TILT_ANGLE, minRadius, modelMass, modelCmHeight);
-						cout << "searched base height: " << baseHeight << "\n";
-					}
-					/// scaling the base size
-					{
-						//baseHeight -= BASE_ERROR_OFFSET * 4;
+						binarySearchBaseHeight(baseHeight, TILT_ANGLE, minRadius, modelMass, modelCmHeight);
 						scaleMesh(baseHeight, minRadius, minRadius, Vertices1, VertexCount1);
+						cout << "searched base height: " << baseHeight << "\n";
 					}
 					dGeomTriMeshDataBuildSimple(TriData2, (dReal*)Vertices1, VertexCount1, (dTriIndex*)Indices1, IndexCount1);
 					obj[i].geom[1] = dCreateTriMesh(space, TriData2, 0, 0, 0);
@@ -798,14 +796,13 @@ static void command(int cmd) {
 			dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
 			dBodySetMass(obj[i].body, &m);
 		}
-		if ( !setBody )
+		if ( !setBody ) {
 			for ( k = 0; k < GPB; k++ ) {
 				cout << "c6\n";
 				if ( obj[i].geom[k] ) dGeomSetBody(obj[i].geom[k], obj[i].body);
 			}
-		//cout << "c7\n";
+		}
 		dBodySetMass(obj[i].body, &m);
-		//cout << "c8\n";
 	}
 
 	if ( cmd == ' ' ) {
