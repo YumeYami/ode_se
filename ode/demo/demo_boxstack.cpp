@@ -445,23 +445,26 @@ bool binarySearchBaseHeight(double &baseHeight, double tiltAngle, double minRadi
 	}
 	maxH = baseHeight;
 	minH = maxH;
-	double m2 = 2.0 / 3 * M_PI*SQR(minRadius)*minH*DENSITY_BASE;
-	double h = (modelMass*modelCmHeight - m2 * 3 / 8 * minH);
-	double til = sqrt(SQR((SQR(minRadius) - SQR(minH)) / h) - SQR(minH)) / minRadius;
-	double til_rad = atan(til);
+	double m2, h, til;
+	double til_rad = tiltAngle + 0.1;
 	double mulDec = 0.01;
+	bool reachMinH = false;
 	while ( til_rad > tiltAngle ) {
-		minH -= mulDec;
-		mulDec *= 2;
-		if ( minH <= BASE_HEIGHT_OFFSET ) {
-			cout << "error-----------------------------------------\n";
-			break;
+		if ( minH < BASE_HEIGHT_OFFSET && !reachMinH ) {
+			minH = BASE_HEIGHT_OFFSET;
+			reachMinH = true;
 		}
-		m2 = 2.0 / 3 * M_PI*SQR(minRadius)*minH*DENSITY_BASE;
+		else if ( minH < BASE_HEIGHT_OFFSET && reachMinH ) {
+			cout << "error-----------------------------------------\n";
+			return false;
+		}
+		m2 = baseMass(minRadius, minH, DENSITY_BASE, DENSITY_BASE_FACE, FACE_THICKNESS);
 		h = (modelMass*modelCmHeight - m2 * 3 / 8 * minH) / (modelMass + m2);
 		til = sqrt(SQR((SQR(minRadius) - SQR(minH)) / h) - SQR(minH)) / minRadius;
 		til_rad = atan(til);
 		cout << "til_rad " << til_rad << "\n";
+		minH -= mulDec;
+		mulDec *= 2;
 	}
 	while ( abs(minH - maxH) >= MIN_BINARY_SEARCH ) {
 		double tmpH = (minH + maxH) / 2;
@@ -576,7 +579,7 @@ static void command(int cmd) {
 										   Sphere_pointcount,
 										   Sphere_polygons);
 #endif
-	}
+		}
 		//----> Convex Object
 		else if ( cmd == 'y' ) {
 			dMassSetCylinder(&m, DENSITY, 3, sides[0], sides[1]);
@@ -836,7 +839,7 @@ static void command(int cmd) {
 			}
 		}
 		dBodySetMass(obj[i].body, &m);
-}
+	}
 
 	if ( cmd == ' ' ) {
 		selected++;
