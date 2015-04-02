@@ -122,10 +122,10 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 #define DENSITY_BODY		0.8*DENSITY_BODY_FACE
 
 #define DENSITY_BASE_FACE	1.380386254*DENSITY_SCALING
-#define DENSITY_BASE		1.380386254*DENSITY_SCALING*5.9658369994025843958125135902092
+#define DENSITY_BASE		1.380386254*DENSITY_SCALING*5.9658369994025843958125135902092 * 0.64
 
 #define FACE_THICKNESS			0.735921418*BODY_SCALING_FACTOR
-#define USE_2_TYPE_DENSITY		0
+#define USE_2_TYPE_DENSITY		1
 /// iron 110g/100 = 
 ///		0.00820489234215678779661524500649 g/mm^3
 /// PLA = 
@@ -140,7 +140,7 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 #define START_HEIGHT		4.0
 //#define TILT_ANGLE		(M_PI_4 + M_PI/4)
 #define TILT_ANGLE			90.0/180*M_PI
-#define TILT_ANGLE_INIT		TILT_ANGLE-0.1
+#define TILT_ANGLE_INIT		TILT_ANGLE
 
 /// file reading const
 #define MAX_VERTEX 9999
@@ -417,11 +417,11 @@ void calTrimeshFaceMass(dMass &mFace, dReal modelThickness, dReal densityModelFa
 }
 
 double ellipsoidMass(double radius, double height, double density) {
-	return  2.0 / 3.0 * M_PI * SQR(radius) * height;
+	return  2.0 / 3.0 * M_PI * SQR(radius) * height * density;
 }
 
 double baseMass(double radius, double height, double internal_density, double face_density, double face_thick) {
-	if ( USE_2_TYPE_DENSITY && face_thick > BASE_HEIGHT_OFFSET * 2 ) {
+	if ( USE_2_TYPE_DENSITY && height > face_thick * 2 ) {
 		double faceMass = ellipsoidMass(radius, height, face_density) - ellipsoidMass(radius - 2.0*face_thick, height - 2.0*face_thick, face_density);
 		double internalMass = ellipsoidMass(radius - 2.0*face_thick, height - 2.0*face_thick, internal_density);
 		return faceMass + internalMass;
@@ -715,7 +715,7 @@ static void command(int cmd) {
 					TriData1 = dGeomTriMeshDataCreate();
 					/// load and scale model
 					stlLoad(BODY_FILE, VertexCount0, IndexCount0, &Indices0[0], &Vertices0[0], 1);
-					scaleMesh(BODY_SCALING_FACTOR, BODY_SCALING_FACTOR, BODY_SCALING_FACTOR, Vertices0, VertexCount0);
+					scaleMesh(BODY_SCALING_FACTOR, BODY_SCALING_FACTOR, BODY_SCALING_FACTOR*1.5, Vertices0, VertexCount0);
 
 					/// calculate face mass
 					dMass mFace;
@@ -730,7 +730,7 @@ static void command(int cmd) {
 					if ( DENSITY_BODY != 0 ) {
 						dMassSetTrimesh(&m2, DENSITY_BODY, obj[i].geom[0]);
 					}
-
+					//mFace.setZero();
 					/// sum mass
 					cout << "\nface mass: " << mFace.mass << "\n";
 					cout << "face cm" << mFace.c[0] << " " << mFace.c[1] << " " << mFace.c[2] << "\n";
@@ -754,7 +754,8 @@ static void command(int cmd) {
 					dpos[2][2] = modelCmHeight;
 					cout << "body translate height: " << modelCmHeight << " min radius: " << minRadius << "\n";
 					modelCmHeight += m2.c[2];
-					cout << "body cm height" << modelCmHeight << "\n\n";
+					modelCmHeight = abs(modelCmHeight);
+					cout << "abs body cm height" << modelCmHeight << "\n\n";
 					/// set model position
 					dGeomSetPosition(obj[i].geom[0], m2.c[0], m2.c[1], m.c[2]);
 					//dMassTranslate(&m2, -m2.c[0], -m2.c[1], -m2.c[2]);
@@ -767,7 +768,18 @@ static void command(int cmd) {
 					stlLoad(BASE_MESH_FILE, VertexCount1, IndexCount1, &Indices1[0], &Vertices1[0], 0);
 
 					double maxBaseHeight;
-					maxBaseHeight = 2.0 / minRadius * sqrt(modelMass * abs(modelCmHeight) / DENSITY_BASE_FACE / M_PI);
+					//maxBaseHeight = 2.0 / minRadius * sqrt(modelMass * abs(modelCmHeight) / DENSITY_BASE_FACE / M_PI);
+					double a = minRadius;
+					double p1 = DENSITY_BASE_FACE, p2 = DENSITY_BASE - DENSITY_BASE_FACE, o = FACE_THICKNESS;
+					double x = SQR(a - 2 * o);
+					cout << "\nx: " << x << "\n";
+					double k1 = SQR(a)*p1 + x*p2;
+					cout << "\nk1: " << k1 << "\n";
+					double k2 = -4.0 / 3 * x*o*p2;
+					cout << "\nk2: " << k2 << "\n";
+					double k3 = -4.0 / 3 * SQR(o)*x*p2 - 4.0 / M_PI*modelMass*modelCmHeight;
+					cout << "\nk3: " << k3 << "\n";
+					maxBaseHeight = (-k2 + sqrt(SQR(k2) - 4 * k1*k3)) / 2 / k1;
 
 					cout << "minRadius " << minRadius << "\tmodelMass " << modelMass << "\nmodelCmHeight " << modelCmHeight << "\tmaxBaseHeight " << maxBaseHeight << "\n";
 					if ( maxBaseHeight < minRadius ) {
