@@ -116,12 +116,13 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 
 /// input const
 #define BODY_SCALING_FACTOR (1.0/10.0)
+#define DENSITY_SCALING		(1.0/1)
 
-#define DENSITY_BODY_FACE	1.380386254
+#define DENSITY_BODY_FACE	1.380386254*DENSITY_SCALING
 #define DENSITY_BODY		0.8*DENSITY_BODY_FACE
 
-#define DENSITY_BASE_FACE	1.380386254
-#define DENSITY_BASE		1.380386254
+#define DENSITY_BASE_FACE	1.380386254*DENSITY_SCALING
+#define DENSITY_BASE		1.380386254*DENSITY_SCALING*5.9658369994025843958125135902092
 
 #define FACE_THICKNESS			0.735921418*BODY_SCALING_FACTOR
 #define USE_2_TYPE_DENSITY		0
@@ -138,8 +139,8 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 
 #define START_HEIGHT		4.0
 //#define TILT_ANGLE		(M_PI_4 + M_PI/4)
-#define TILT_ANGLE			75.0/180*M_PI
-#define TILT_ANGLE_INIT		TILT_ANGLE + 0.1
+#define TILT_ANGLE			90.0/180*M_PI
+#define TILT_ANGLE_INIT		TILT_ANGLE-0.1
 
 /// file reading const
 #define MAX_VERTEX 9999
@@ -416,11 +417,11 @@ void calTrimeshFaceMass(dMass &mFace, dReal modelThickness, dReal densityModelFa
 }
 
 double ellipsoidMass(double radius, double height, double density) {
-	return 2.0 / 3.0 * M_PI * SQR(radius) * height;
+	return  2.0 / 3.0 * M_PI * SQR(radius) * height;
 }
 
 double baseMass(double radius, double height, double internal_density, double face_density, double face_thick) {
-	if ( USE_2_TYPE_DENSITY ) {
+	if ( USE_2_TYPE_DENSITY && face_thick > BASE_HEIGHT_OFFSET * 2 ) {
 		double faceMass = ellipsoidMass(radius, height, face_density) - ellipsoidMass(radius - 2.0*face_thick, height - 2.0*face_thick, face_density);
 		double internalMass = ellipsoidMass(radius - 2.0*face_thick, height - 2.0*face_thick, internal_density);
 		return faceMass + internalMass;
@@ -732,9 +733,14 @@ static void command(int cmd) {
 
 					/// sum mass
 					cout << "\nface mass: " << mFace.mass << "\n";
+					cout << "face cm" << mFace.c[0] << " " << mFace.c[1] << " " << mFace.c[2] << "\n";
 					cout << "model mass: " << m2.mass << "\n";
+					cout << "m2 cm" << m2.c[0] << " " << m2.c[1] << " " << m2.c[2] << "\n";
+
 					dMassAdd(&m2, &mFace);
 					modelMass = m2.mass;
+					cout << "total mass: " << m2.mass << "\n";
+					cout << "total cm" << m2.c[0] << " " << m2.c[1] << " " << m2.c[2] << "\n";
 
 					/// calculate model property
 					calModelProperty(modelCmHeight, minRadius, m2, VertexCount0, IndexCount0, Vertices0, Indices0); /// calculate model for min height and radius(contact area)
@@ -746,8 +752,9 @@ static void command(int cmd) {
 					dpos[2][0] = m2.c[0];
 					dpos[2][1] = m2.c[1];
 					dpos[2][2] = modelCmHeight;
-					cout << "minHeight: " << modelCmHeight << " minRadius: " << minRadius << "\n";
-
+					cout << "body translate height: " << modelCmHeight << " min radius: " << minRadius << "\n";
+					modelCmHeight += m2.c[2];
+					cout << "body cm height" << modelCmHeight << "\n\n";
 					/// set model position
 					dGeomSetPosition(obj[i].geom[0], m2.c[0], m2.c[1], m.c[2]);
 					//dMassTranslate(&m2, -m2.c[0], -m2.c[1], -m2.c[2]);
@@ -760,7 +767,7 @@ static void command(int cmd) {
 					stlLoad(BASE_MESH_FILE, VertexCount1, IndexCount1, &Indices1[0], &Vertices1[0], 0);
 
 					double maxBaseHeight;
-					maxBaseHeight = 2.0 / minRadius * sqrt(modelMass * abs(modelCmHeight) / DENSITY_BASE / M_PI);
+					maxBaseHeight = 2.0 / minRadius * sqrt(modelMass * abs(modelCmHeight) / DENSITY_BASE_FACE / M_PI);
 
 					cout << "minRadius " << minRadius << "\tmodelMass " << modelMass << "\nmodelCmHeight " << modelCmHeight << "\tmaxBaseHeight " << maxBaseHeight << "\n";
 					if ( maxBaseHeight < minRadius ) {
@@ -769,7 +776,7 @@ static void command(int cmd) {
 						cout << "searched base height: " << maxBaseHeight << "\n";
 					}
 					else {
-						//cout << "cannot use these density and angle to make rocking base\n";
+						cout << "min height > radius\n";
 						maxRadius = sqrt(sqrt(4.0 / M_PI*modelMass*abs(modelCmHeight)));
 						maxRadius += BASE_HEIGHT_OFFSET;
 						cout << "max radius: " << maxRadius << "\n";
@@ -782,9 +789,9 @@ static void command(int cmd) {
 
 					/// calculate mass property of basement
 					{
-						dReal basemass = 2.0 / 3 * M_PI*SQR(minRadius)*maxBaseHeight * DENSITY_BASE;
+						dReal basemass = baseMass(minRadius, maxBaseHeight, DENSITY_BASE, DENSITY_BASE_FACE, FACE_THICKNESS);
 						dReal gz = 3.0 / 8 * maxBaseHeight;
-						cout << "base mass: " << basemass << "\n";
+						cout << "base mass: " << basemass << " min radius " << minRadius << " max base height " << maxBaseHeight << "\n";
 						dReal i1 = basemass / 5.0*(SQR(minRadius) + SQR(maxBaseHeight));
 						dReal i11 = i1 - basemass*SQR(gz);
 						dReal i22 = i11;
