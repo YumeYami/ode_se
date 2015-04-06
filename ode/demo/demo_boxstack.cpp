@@ -116,16 +116,20 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 
 /// input const
 #define BODY_SCALING_FACTOR (1.0/10.0)
-#define DENSITY_SCALING		(1.0/1)
+#define DENSITY_SCALING		(1.0/10)
 
 #define DENSITY_BODY_FACE	1.380386254*DENSITY_SCALING
 #define DENSITY_BODY		0.8*DENSITY_BODY_FACE
+//#define DENSITY_BODY		0.16661562*DENSITY_BODY_FACE
+//#define DENSITY_BODY		0
 
-#define DENSITY_BASE_FACE	1.380386254*DENSITY_SCALING
-#define DENSITY_BASE		1.380386254*DENSITY_SCALING*5.9658369994025843958125135902092 * 0.64
+
+#define DENSITY_BASE_FACE	DENSITY_BODY_FACE
+//#define DENSITY_BASE		DENSITY_BODY_FACE*5.9658369994025843958125135902092 * 0.64
+#define DENSITY_BASE		DENSITY_BASE_FACE
 
 #define FACE_THICKNESS			0.735921418*BODY_SCALING_FACTOR
-#define USE_2_TYPE_DENSITY		1
+#define USE_2_TYPE_DENSITY		0
 /// iron 110g/100 = 
 ///		0.00820489234215678779661524500649 g/mm^3
 /// PLA = 
@@ -137,15 +141,15 @@ const double zeroRot[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
 #define BASE_ERROR_OFFSET		2.0*BODY_SCALING_FACTOR
 #define MIN_BINARY_SEARCH		0.0001
 
-#define START_HEIGHT		4.0
-//#define TILT_ANGLE		(M_PI_4 + M_PI/4)
-#define TILT_ANGLE			90.0/180*M_PI
-#define TILT_ANGLE_INIT		TILT_ANGLE
+#define START_HEIGHT		3.10
+
+#define TILT_ANGLE			80.0/180*M_PI
+#define TILT_ANGLE_INIT		TILT_ANGLE+(-1.0)/180*M_PI
 
 /// file reading const
 #define MAX_VERTEX 9999
 #define MAX_INDEX 9999
-#define BODY_FILE "mons1.2.stl"
+#define BODY_FILE "mons1.2x.stl"
 #define BASE_MESH_FILE "sphere_cut.stl"
 #define BASE_WEIGHT_FILE "cube.stl"
 #define READ_CLOCKWISE 1
@@ -420,19 +424,27 @@ double ellipsoidMass(double radius, double height, double density) {
 	return  2.0 / 3.0 * M_PI * SQR(radius) * height * density;
 }
 
-double baseMass(double radius, double height, double internal_density, double face_density, double face_thick) {
-	if ( USE_2_TYPE_DENSITY && height > face_thick * 2 ) {
-		double faceMass = ellipsoidMass(radius, height, face_density) - ellipsoidMass(radius - 2.0*face_thick, height - 2.0*face_thick, face_density);
-		double internalMass = ellipsoidMass(radius - 2.0*face_thick, height - 2.0*face_thick, internal_density);
-		return faceMass + internalMass;
+double baseMass(double radius, double height, double inner_density, double face_density, double face_thick) {
+	if ( USE_2_TYPE_DENSITY && height > face_thick * 2 && inner_density > face_density ) {
+		double faceMass = ellipsoidMass(radius, height, face_density) + ellipsoidMass(radius - 2.0*face_thick, height - 2.0*face_thick, inner_density - face_density);
+		//double internalMass = ellipsoidMass(radius - 2.0*face_thick, height - 2.0*face_thick, internal_density);
+		//return faceMass + internalMass;
+		return faceMass;
 	}
 	else {
 		return ellipsoidMass(radius, height, DENSITY_BASE_FACE);
 	}
 }
 
-bool binarySearchBaseHeight(double &baseHeight, double tiltAngle, double minRadius, double modelMass, double modelCmHeight) {
-	if ( tiltAngle >= M_PI_2 ) {
+double calculateAngle(double base_radius, double base_height, double model_mase, double model_cm_height) {
+	double m2 = baseMass(base_radius, base_height, DENSITY_BASE, DENSITY_BASE_FACE, FACE_THICKNESS);
+	double h = (model_mase*model_cm_height - m2 * 3 / 8 * base_height) / (model_mase + m2);
+	double til = sqrt(SQR((SQR(base_radius) - SQR(base_height)) / h) - SQR(base_height)) / base_radius;
+	return til;
+}
+
+bool binarySearchBaseHeight(double &baseHeight, double input_angle, double minRadius, double modelMass, double modelCmHeight) {
+	if ( input_angle >= M_PI_2 ) {
 		return true;
 	}
 	modelCmHeight = abs(modelCmHeight);
@@ -440,17 +452,18 @@ bool binarySearchBaseHeight(double &baseHeight, double tiltAngle, double minRadi
 	double min_slope = sqrt(SQR((modelMass + baseMass(minRadius, minH, DENSITY_BASE, DENSITY_BASE_FACE, FACE_THICKNESS)) * (SQR(minRadius) - SQR(minH)) / (modelMass*modelCmHeight - baseMass(minRadius, minH, DENSITY_BASE, DENSITY_BASE_FACE, FACE_THICKNESS) * 3 / 8 * minH)) - SQR(minH)) / minRadius;
 	cout << "min slope " << min_slope << "\n";
 	cout << "min tilt angle " << atan(min_slope) << " \t" << atan(min_slope) * 180 / M_PI << "\n\n";
-	if ( atan(min_slope) > tiltAngle ) {
+	cout << "input angle " << input_angle << "\n";
+	if ( atan(min_slope) > input_angle ) {
 		cout << "min tilt angle = " << min_slope << "\n";
 		return false;
 	}
 	maxH = baseHeight;
 	minH = maxH;
 	double m2, h, til;
-	double til_rad = tiltAngle + 0.1;
+	double til_rad = input_angle + 0.1;
 	double mulDec = 0.01;
 	bool reachMinH = false;
-	while ( til_rad > tiltAngle ) {
+	while ( til_rad > input_angle ) {
 		if ( minH < BASE_HEIGHT_OFFSET && !reachMinH ) {
 			minH = BASE_HEIGHT_OFFSET;
 			reachMinH = true;
@@ -478,28 +491,29 @@ bool binarySearchBaseHeight(double &baseHeight, double tiltAngle, double minRadi
 			cout << "error---------------------------------------\n";
 			break;
 		}
-		else if ( til_rad > tiltAngle ) {
+		else if ( til_rad > input_angle ) {
 			maxH = tmpH;
 		}
-		else if ( til_rad < tiltAngle ) {
+		else if ( til_rad < input_angle ) {
 			minH = tmpH;
 		}
 		else {
 			break;
 		}
-		cout << "input: " << tiltAngle << " tilt: " << atan(til) << "\n";
+		cout << "input: " << input_angle << " tilt: " << atan(til) << "\n";
 	}
 	baseHeight = minH;
 
 	/// debugging section
 	double bh = 0.01;
-	while ( bh < minRadius ) {
-		m2 = 2.0 / 3 * M_PI*SQR(minRadius)*bh*DENSITY_BASE;
-		h = (modelMass*modelCmHeight - m2 * 3 / 8 * bh) / (modelMass + m2);
-		til = sqrt(SQR((SQR(minRadius) - SQR(bh)) / h) - SQR(bh)) / minRadius;
-		cout << "bh: " << bh << " m2: " << m2 << " h: " << h << " til: " << til << "\n";
+	while ( bh < 5 ) {
+// 		m2 = 2.0 / 3 * M_PI*SQR(minRadius)*bh*DENSITY_BASE;
+// 		h = (modelMass*modelCmHeight - m2 * 3 / 8 * bh) / (modelMass + m2);
+// 		til = sqrt(SQR((SQR(minRadius) - SQR(bh)) / h) - SQR(bh)) / minRadius;
+		til = calculateAngle(minRadius, bh, modelMass, modelCmHeight);
+		cout << "bh: " << bh << " m2: " << m2 << " h: " << h << " til: " << til << " angle: " << atan(til) * 180 / M_PI << "\n";
 		//cout << "bh: " << bh << " \ttan: " << til << " \tangle: " << atan(til) << " \tangle(d): " << atan(til) * 180 / M_PI << "\n";
-		bh += 0.02;
+		bh += 0.04;
 	}
 	return true;
 }
@@ -647,6 +661,7 @@ static void command(int cmd) {
 		else if ( cmd == 'm' ) {
 			TriData1 = dGeomTriMeshDataCreate();
 			stlLoad(BODY_FILE, VertexCount0, IndexCount0, &Indices0[0], &Vertices0[0], 1);
+			scaleMesh(BODY_SCALING_FACTOR, BODY_SCALING_FACTOR, BODY_SCALING_FACTOR, Vertices0, VertexCount0);
 			dGeomTriMeshDataBuildSimple(TriData1, (dReal*)Vertices0, VertexCount0, (dTriIndex*)Indices0, IndexCount0);
 			obj[i].geom[0] = dCreateTriMesh(space, TriData1, 0, 0, 0);
 			dGeomSetData(obj[i].geom[0], TriData1);
@@ -655,7 +670,6 @@ static void command(int cmd) {
 			//dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
 			dGeomSetPosition(obj[i].geom[0], -m.c[0], -m.c[1], -m.c[2]);
 			dMassTranslate(&m, -m.c[0], -m.c[1], -m.c[2]);
-
 		}
 		else if ( cmd == 'n' ) {
 			TriData2 = dGeomTriMeshDataCreate();
@@ -715,7 +729,7 @@ static void command(int cmd) {
 					TriData1 = dGeomTriMeshDataCreate();
 					/// load and scale model
 					stlLoad(BODY_FILE, VertexCount0, IndexCount0, &Indices0[0], &Vertices0[0], 1);
-					scaleMesh(BODY_SCALING_FACTOR, BODY_SCALING_FACTOR, BODY_SCALING_FACTOR*1.5, Vertices0, VertexCount0);
+					scaleMesh(BODY_SCALING_FACTOR, BODY_SCALING_FACTOR, 1.5*BODY_SCALING_FACTOR, Vertices0, VertexCount0);
 
 					/// calculate face mass
 					dMass mFace;
@@ -732,15 +746,15 @@ static void command(int cmd) {
 					}
 					//mFace.setZero();
 					/// sum mass
-					cout << "\nface mass: " << mFace.mass << "\n";
-					cout << "face cm" << mFace.c[0] << " " << mFace.c[1] << " " << mFace.c[2] << "\n";
-					cout << "model mass: " << m2.mass << "\n";
-					cout << "m2 cm" << m2.c[0] << " " << m2.c[1] << " " << m2.c[2] << "\n";
+					cout << "\nface mass: \t" << mFace.mass << "\n";
+					cout << "face cm: \t" << mFace.c[0] << " " << mFace.c[1] << " " << mFace.c[2] << "\n";
+					cout << "model mass: \t" << m2.mass << "\n";
+					cout << "m2 cm: \t" << m2.c[0] << " " << m2.c[1] << " " << m2.c[2] << "\n";
 
 					dMassAdd(&m2, &mFace);
 					modelMass = m2.mass;
-					cout << "total mass: " << m2.mass << "\n";
-					cout << "total cm" << m2.c[0] << " " << m2.c[1] << " " << m2.c[2] << "\n";
+					cout << "total mass: \t" << m2.mass << "\n";
+					cout << "total cm: \t" << m2.c[0] << " " << m2.c[1] << " " << m2.c[2] << "\n";
 
 					/// calculate model property
 					calModelProperty(modelCmHeight, minRadius, m2, VertexCount0, IndexCount0, Vertices0, Indices0); /// calculate model for min height and radius(contact area)
@@ -753,8 +767,9 @@ static void command(int cmd) {
 					dpos[2][1] = m2.c[1];
 					dpos[2][2] = modelCmHeight;
 					cout << "body translate height: " << modelCmHeight << " min radius: " << minRadius << "\n";
-					modelCmHeight += m2.c[2];
 					modelCmHeight = abs(modelCmHeight);
+					modelCmHeight += m2.c[2];
+
 					cout << "abs body cm height" << modelCmHeight << "\n\n";
 					/// set model position
 					dGeomSetPosition(obj[i].geom[0], m2.c[0], m2.c[1], m.c[2]);
@@ -767,32 +782,43 @@ static void command(int cmd) {
 					/// load and scale base size
 					stlLoad(BASE_MESH_FILE, VertexCount1, IndexCount1, &Indices1[0], &Vertices1[0], 0);
 
+					// calculate base height for 90 degree
 					double maxBaseHeight;
 					//maxBaseHeight = 2.0 / minRadius * sqrt(modelMass * abs(modelCmHeight) / DENSITY_BASE_FACE / M_PI);
 					double a = minRadius;
 					double p1 = DENSITY_BASE_FACE, p2 = DENSITY_BASE - DENSITY_BASE_FACE, o = FACE_THICKNESS;
 					double x = SQR(a - 2 * o);
-					cout << "\nx: " << x << "\n";
 					double k1 = SQR(a)*p1 + x*p2;
-					cout << "\nk1: " << k1 << "\n";
 					double k2 = -4.0 / 3 * x*o*p2;
-					cout << "\nk2: " << k2 << "\n";
 					double k3 = -4.0 / 3 * SQR(o)*x*p2 - 4.0 / M_PI*modelMass*modelCmHeight;
-					cout << "\nk3: " << k3 << "\n";
 					maxBaseHeight = (-k2 + sqrt(SQR(k2) - 4 * k1*k3)) / 2 / k1;
 
 					cout << "minRadius " << minRadius << "\tmodelMass " << modelMass << "\nmodelCmHeight " << modelCmHeight << "\tmaxBaseHeight " << maxBaseHeight << "\n";
-					if ( maxBaseHeight < minRadius ) {
+					if ( maxBaseHeight < minRadius - BASE_HEIGHT_OFFSET ) {
 						binarySearchBaseHeight(maxBaseHeight, TILT_ANGLE, minRadius, modelMass, modelCmHeight);
 						scaleMesh(maxBaseHeight, minRadius, minRadius, Vertices1, VertexCount1);
 						cout << "searched base height: " << maxBaseHeight << "\n";
+						double count = 0.01;
+						while ( count < minRadius ) {
+							double tilt_angle = calculateAngle(minRadius, count, modelMass, modelCmHeight);
+							cout << "height: " << count << " \tangle: " << atan(tilt_angle) << " \t" << atan(tilt_angle) / M_PI * 180 << "\n";
+							count += 0.02;
+						}
 					}
 					else {
-						cout << "min height > radius\n";
-						maxRadius = sqrt(sqrt(4.0 / M_PI*modelMass*abs(modelCmHeight)));
+						cout << "min height > radius-offset------------------------------------------------------------\n";
+						double count = 0.01;
+						while ( count < 5 ) {
+							double tilt_angle = calculateAngle(count, count-1*BASE_HEIGHT_OFFSET, modelMass, modelCmHeight);
+							cout << "height: " << count << " \tangle: " << atan(tilt_angle) << " \t" << atan(tilt_angle) / M_PI * 180 << "\n";
+							count += 0.02;
+						}
+						binarySearchBaseHeight(maxBaseHeight, TILT_ANGLE, minRadius, modelMass, modelCmHeight);
+						/// binary search base size
+						/*maxRadius = sqrt(sqrt(4.0 / M_PI*modelMass*abs(modelCmHeight)));
 						maxRadius += BASE_HEIGHT_OFFSET;
-						cout << "max radius: " << maxRadius << "\n";
-						scaleMesh(maxRadius - BASE_HEIGHT_OFFSET, maxRadius, maxRadius, Vertices1, VertexCount1);
+						cout << "max radius: " << maxRadius << "\n";*/
+						scaleMesh(maxBaseHeight, minRadius, minRadius, Vertices1, VertexCount1);
 						//binarySearchBaseSize(baseHeight, TILT_ANGLE, minRadius, maxRadius, modelMass, modelCmHeight);
 					}
 					dGeomTriMeshDataBuildSimple(TriData2, (dReal*)Vertices1, VertexCount1, (dTriIndex*)Indices1, IndexCount1);
@@ -804,7 +830,7 @@ static void command(int cmd) {
 						dReal basemass = baseMass(minRadius, maxBaseHeight, DENSITY_BASE, DENSITY_BASE_FACE, FACE_THICKNESS);
 						dReal gz = 3.0 / 8 * maxBaseHeight;
 						cout << "base mass: " << basemass << " min radius " << minRadius << " max base height " << maxBaseHeight << "\n";
-						dReal i1 = basemass / 5.0*(SQR(minRadius) + SQR(maxBaseHeight));
+						dReal i1 = basemass / 5.0 * (SQR(minRadius) + SQR(maxBaseHeight));
 						dReal i11 = i1 - basemass*SQR(gz);
 						dReal i22 = i11;
 						dReal i33 = basemass / 5.0 * 2.0 * SQR(minRadius);
