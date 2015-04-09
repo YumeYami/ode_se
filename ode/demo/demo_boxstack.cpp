@@ -881,7 +881,7 @@ static void command(int cmd) {
 // 									cout << "mid: " << mid_base << " tilt angle " << til / M_PI * 180 << "\n";
 								}
 								base_radius = max_base;
-								base_radius += 0.15;
+ 								base_radius += 0.47213;
 								base_height = base_radius - BASE_HEIGHT_OFFSET;
 							}
 						}
@@ -896,12 +896,12 @@ static void command(int cmd) {
 
 					/// calculate mass property of basement
 					{
-						dReal basemass = baseMass(minRadius, maxBaseHeight, DENSITY_BASE, DENSITY_BASE_FACE, FACE_THICKNESS);
-						dReal gz = 3.0 / 8 * maxBaseHeight;
-						dReal i1 = basemass / 5.0 * (SQR(minRadius) + SQR(maxBaseHeight));
+						dReal basemass = baseMass(base_radius, base_height, DENSITY_BASE, DENSITY_BASE_FACE, FACE_THICKNESS);
+						dReal gz = 3.0 / 8 * base_height;
+						dReal i1 = basemass / 5.0 * (SQR(base_radius) + SQR(base_height));
 						dReal i11 = i1 - basemass*SQR(gz);
 						dReal i22 = i11;
-						dReal i33 = basemass / 5.0 * 2.0 * SQR(minRadius);
+						dReal i33 = basemass / 5.0 * 2.0 * SQR(base_radius);
 						m2.setParameters(basemass, -gz, 0.0, 0.0, i33, i22, i11, 0, 0, 0);
 					}
 					dGeomSetPosition(obj[i].geom[1], m2.c[0], m2.c[1], m.c[2]);
