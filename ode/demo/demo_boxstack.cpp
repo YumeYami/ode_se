@@ -144,7 +144,7 @@ int USE_2_TYPE_DENSITY = 0;
 
 #define START_HEIGHT		5.0
 
-double TILT_ANGLE = 80.0 / 180 * M_PI;
+double TILT_ANGLE = 90.0 / 180 * M_PI;
 double START_ANGLE_INIT = TILT_ANGLE + (0.0) / 180 * M_PI;
 
 /// file reading const
@@ -793,32 +793,32 @@ static void command(int cmd) {
 					double k2 = -4.0 / 3 * x*o*p2;
 					double k3 = -4.0 / 3 * SQR(o)*x*p2 - 4.0 / M_PI*modelMass*modelCmHeight;
 					maxBaseHeight = (-k2 + sqrt(SQR(k2) - 4 * k1*k3)) / 2 / k1;
-					cout << "min radius " << minRadius << "\tmodel mass " << modelMass << "\nmodel cm height " << modelCmHeight << "\tmax base height " << maxBaseHeight << "\n";
+// 					cout << "min radius " << minRadius << "\tmodel mass " << modelMass << "\nmodel cm height " << modelCmHeight << "\tmax base height " << maxBaseHeight << "\n";
 
 					double base_height = maxBaseHeight;
 					double base_radius = minRadius;
 					if ( maxBaseHeight < minRadius - BASE_HEIGHT_OFFSET ) {
-						cout << "method 1\n";
+// 						cout << "method 1\n";
 						binarySearchBaseHeight(base_height, TILT_ANGLE, base_radius, modelMass, modelCmHeight);
 					}
 					else {
-						cout << "method 2\n";
+// 						cout << "method 2\n";
 
 						double angle = calculateAngle(minRadius, minRadius - BASE_HEIGHT_OFFSET, modelMass, modelCmHeight);
-						cout << "max angle at min radius: " << angle << "\n";
+// 						cout << "max angle at min radius: " << angle << "\n";
 
 						base_height = minRadius - BASE_HEIGHT_OFFSET;
 						base_radius = minRadius;
 						if ( angle > TILT_ANGLE ) {
-							cout << "method 2.1\n";
+// 							cout << "method 2.1\n";
 							binarySearchBaseHeight(base_height, TILT_ANGLE, base_radius, modelMass, modelCmHeight);
 						}
 						else {
-							cout << "method 2.2\n";
+// 							cout << "method 2.2\n";
 // 							cout << "--------------test\n";
 // 							double count = 0.01;
 // 							while ( count < 6 ) {
-// 								double tilt_angle = calculateAngle(count, count-BASE_HEIGHT_OFFSET, modelMass, modelCmHeight);
+// 								double tilt_angle = calculateAngle(count, count - BASE_HEIGHT_OFFSET, modelMass, modelCmHeight);
 // 								cout << "height: " << count << " \tangle: " << atan(tilt_angle) << " \t" << atan(tilt_angle) / M_PI * 180 << "\n";
 // 								count += 0.05;
 // 							}
@@ -835,45 +835,53 @@ static void command(int cmd) {
 								angle = calculateAngle(max_base, max_base - BASE_HEIGHT_OFFSET, modelMass, modelCmHeight);
 								angle = atan(angle);
 								if ( angle <= tmp_angle ) {
+// 									cout << "angle < tmp\n";
 									///search to maximum
 									search_max = true;
 									break;
 								}
 								else if ( angle <= TILT_ANGLE ) {
+// 									cout << "angle <= tilt angle\n";
 									break;
 								}
-								cout << "radius: " << max_base << " angle " << angle << " \t" << angle / M_PI * 180 << "\n";
+// 								cout << "radius: " << max_base << " angle " << angle << " \t" << angle / M_PI * 180 << "\n";
 								min_base = max_base;
 								tmp_angle = angle;
 								max_base += mult;
-								mult += 0.02;
+								//mult += 0.02;
+								//cout << "search max rad angle: " << angle << "\n";
 							}
 							if ( search_max ) {
-								cout << "method 2.2.1\n";
+//  								cout << "method 2.2.1\n";
 							}
 							else {
-								cout << "method 2.2.2\n";
+//  								cout << "method 2.2.2\n";
 								while ( max_base - min_base > MIN_BINARY_SEARCH ) {
 									double mid_base = (max_base + min_base) / 2;
 									double til = calculateAngle(mid_base, mid_base - BASE_HEIGHT_OFFSET, modelMass, modelCmHeight);
 									til = atan(til);
 									if ( til != til ) {
-										cout << "binary search 2 error";
+// 										cout << "binary search 2 error";
 										break;
 									}
 									else if ( til < TILT_ANGLE ) {
+// 										cout << "<\n";
 										min_base = mid_base;
 									}
 									else if ( til > TILT_ANGLE ) {
+// 										cout << ">\n";
 										max_base = min_base;
 									}
 									else {
+// 										cout << "found\n";
 										base_radius = mid_base;
 										break;
 									}
-									cout << "mid: " << mid_base << " tilt angle " << til / M_PI * 180 << "\n";
+// 									cout << "input: " << TILT_ANGLE / M_PI * 180 << "\n";
+// 									cout << "mid: " << mid_base << " tilt angle " << til / M_PI * 180 << "\n";
 								}
 								base_radius = max_base;
+								base_radius += 0.15;
 								base_height = base_radius - BASE_HEIGHT_OFFSET;
 							}
 						}
@@ -1023,7 +1031,7 @@ void drawGeom(dGeomID g, const dReal *pos, const dReal *R, int show_aabb) {
 					 Sphere_pointcount,
 					 Sphere_polygons);
 #endif
-	}
+}
 	//----> Convex Object
 	else if ( type == dCylinderClass ) {
 		dReal radius, length;
@@ -1181,7 +1189,8 @@ int main(int argc, char **argv) {
 #endif
 
 	dWorldSetLinearDamping(world, 0.00001);
-	dWorldSetAngularDamping(world, 0.005);
+// 	dWorldSetAngularDamping(world, 0.005);
+	dWorldSetAngularDamping(world, 0.001);
 	dWorldSetMaxAngularSpeed(world, 200);
 
 	dWorldSetContactMaxCorrectingVel(world, 0.1);
