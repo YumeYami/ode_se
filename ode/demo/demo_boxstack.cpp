@@ -126,8 +126,8 @@ double BODY_SCALING_HEIGHT = 1.0;
 
 
 #define DENSITY_BASE_FACE	DENSITY_BODY_FACE
-//#define DENSITY_BASE		DENSITY_BODY_FACE*5.9658369994025843958125135902092 * 0.64
-#define DENSITY_BASE		DENSITY_BASE_FACE
+double DENSITY_BASE = DENSITY_BODY_FACE*5.9658369994025843958125135902092 * 0.64;
+//#define DENSITY_BASE		DENSITY_BASE_FACE
 
 #define FACE_THICKNESS			0.735921418*BODY_SCALING_FACTOR
 int USE_2_TYPE_DENSITY = 0;
@@ -793,45 +793,42 @@ static void command(int cmd) {
 					double k2 = -4.0 / 3 * x*o*p2;
 					double k3 = -4.0 / 3 * SQR(o)*x*p2 - 4.0 / M_PI*modelMass*modelCmHeight;
 					maxBaseHeight = (-k2 + sqrt(SQR(k2) - 4 * k1*k3)) / 2 / k1;
+					cout << "min radius " << minRadius << "\tmodel mass " << modelMass << "\nmodel cm height " << modelCmHeight << "\tmax base height " << maxBaseHeight << "\n";
 
-					cout << "minRadius " << minRadius << "\tmodelMass " << modelMass << "\nmodelCmHeight " << modelCmHeight << "\tmaxBaseHeight " << maxBaseHeight << "\n";
+					double base_height = maxBaseHeight;
+					double base_radius = minRadius;
 					if ( maxBaseHeight < minRadius - BASE_HEIGHT_OFFSET ) {
 						cout << "method 1\n";
-						binarySearchBaseHeight(maxBaseHeight, TILT_ANGLE, minRadius, modelMass, modelCmHeight);
-						scaleMesh(maxBaseHeight, minRadius, minRadius, Vertices1, VertexCount1);
-						// 						cout << "searched base height: " << maxBaseHeight << "\n";
-						// 						double count = 0.01;
-						// 						while ( count < minRadius ) {
-						// 							double tilt_angle = calculateAngle(minRadius, count, modelMass, modelCmHeight);
-						// 							cout << "height: " << count << " \tangle: " << atan(tilt_angle) << " \t" << atan(tilt_angle) / M_PI * 180 << "\n";
-						// 							count += 0.02;
-						// 						}
-						cout << "\n\n\nbase height: " << maxBaseHeight;
-						cout << "\nbase radius" << minRadius << "\n";
+						binarySearchBaseHeight(base_height, TILT_ANGLE, base_radius, modelMass, modelCmHeight);
 					}
 					else {
-						cout << "min height > radius-offset------------------------------------------------------------\n";
+						cout << "method 2\n";
+
 						double angle = calculateAngle(minRadius, minRadius - BASE_HEIGHT_OFFSET, modelMass, modelCmHeight);
-						cout << "angle: " << angle << "\n";
-						double base_height = minRadius - BASE_HEIGHT_OFFSET;
-						double base_radius = minRadius;
+						cout << "max angle at min radius: " << angle << "\n";
+
+						base_height = minRadius - BASE_HEIGHT_OFFSET;
+						base_radius = minRadius;
 						if ( angle > TILT_ANGLE ) {
 							cout << "method 2.1\n";
 							binarySearchBaseHeight(base_height, TILT_ANGLE, base_radius, modelMass, modelCmHeight);
 						}
 						else {
 							cout << "method 2.2\n";
-							double count = 0.01;
-							/*while ( count < minRadius ) {
-								double tilt_angle = calculateAngle(minRadius, count, modelMass, modelCmHeight);
-								cout << "height: " << count << " \tangle: " << atan(tilt_angle) << " \t" << atan(tilt_angle) / M_PI * 180 << "\n";
-								count += 0.02;
-								}*/
+// 							cout << "--------------test\n";
+// 							double count = 0.01;
+// 							while ( count < 6 ) {
+// 								double tilt_angle = calculateAngle(count, count-BASE_HEIGHT_OFFSET, modelMass, modelCmHeight);
+// 								cout << "height: " << count << " \tangle: " << atan(tilt_angle) << " \t" << atan(tilt_angle) / M_PI * 180 << "\n";
+// 								count += 0.05;
+// 							}
+// 							cout << "--------------end test\n";
 							angle = TILT_ANGLE - 0.1;
 							double min_base = base_radius;
 							double max_base = min_base;
 							double tmp_angle = angle;
 							double mult = BASE_HEIGHT_OFFSET;
+
 							/// search until max_base > input angle
 							bool search_max = false;
 							while ( angle < TILT_ANGLE || angle != angle ) {
@@ -880,13 +877,11 @@ static void command(int cmd) {
 								base_height = base_radius - BASE_HEIGHT_OFFSET;
 							}
 						}
-						/// binary search base size
-						/*maxRadius = sqrt(sqrt(4.0 / M_PI*modelMass*abs(modelCmHeight)));
-						maxRadius += BASE_HEIGHT_OFFSET;
-						cout << "max radius: " << maxRadius << "\n";*/
-						scaleMesh(maxBaseHeight, minRadius, minRadius, Vertices1, VertexCount1);
-						//binarySearchBaseSize(baseHeight, TILT_ANGLE, minRadius, maxRadius, modelMass, modelCmHeight);
 					}
+					scaleMesh(base_height, base_radius, base_radius, Vertices1, VertexCount1);
+					cout << "\n\n\nbase height: " << base_height;
+					cout << "\nbase radius: " << base_radius << "\n";
+
 					dGeomTriMeshDataBuildSimple(TriData2, (dReal*)Vertices1, VertexCount1, (dTriIndex*)Indices1, IndexCount1);
 					obj[i].geom[1] = dCreateTriMesh(space, TriData2, 0, 0, 0);
 					dGeomSetData(obj[i].geom[1], TriData2);
@@ -1153,6 +1148,9 @@ int main(int argc, char **argv) {
 
 	cout << "density mode (0/1): ";
 	cin >> USE_2_TYPE_DENSITY;
+	if ( USE_2_TYPE_DENSITY == 0 ) {
+		DENSITY_BASE = DENSITY_BODY_FACE;
+	}
 
 	cout << "body scaling height: ";
 	cin >> BODY_SCALING_HEIGHT;
